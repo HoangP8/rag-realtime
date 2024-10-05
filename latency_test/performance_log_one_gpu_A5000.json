@@ -1,0 +1,38 @@
+[
+    {
+        "model_id": "gpt2",
+        "latency_seconds": 4.941154956817627,
+        "model_params": 124439808,
+        "processed_text": "hello I have a stomach and slight headache  which disease did I get, why don't I go home and find you for now, just a simple meal  that is all I need. I will leave you to it then.\n\n(Brief description of how this works can be found here: http://virginia.veku.edu/~thediare/nalc/s_crs_dolores.pdf)\n.\n\n\nYou have 1 hour to enjoy this delicious dish, but if you are feeling sleepy at the moment, the more you eat you get more tired, so if"
+    },
+    {
+        "model_id": "H2O",
+        "latency_seconds": 6.912106275558472,
+        "model_params": 1831201280,
+        "processed_text": "hello I have a stomach and slight headache  which disease did I get the other day?!\nI am looking to redeem myself from my last binge and this past week I had so much cravings for a peach. I haven't had one in over a month and today was my opportunity to go for it. As I was picking them up at the grocery store I got caught in the middle of an avalanche of peaches and when I finally made it through that mountain of fruit it felt like I'd won a prize from a sweepstakes. There they"
+    },
+    {
+        "model_id": "StableMed",
+        "latency_seconds": 4.693071603775024,
+        "model_params": 2795443200,
+        "processed_text": "hello I have a stomach and slight headache  which disease did I get?\nmy daughter has a cough. a temperature around 39, she's 3 months and 3 days. please suggest me.\ni have some red spots on the back of my hand and my fingers are going white. any ideas?"
+    },
+    {
+        "model_id": "phi-2",
+        "latency_seconds": 4.8376288414001465,
+        "model_params": 2779683840,
+        "processed_text": "hello I have a stomach and slight headache  which disease did I get.and what medicine should I take.i am having these symptoms for last three days and i had slight diarrhoea and vomiting two days ago.\nIs anyone having the same symptoms? Please respond me."
+    },
+    {
+        "model_id": "Llama3",
+        "latency_seconds": 9.651596546173096,
+        "model_params": 8030261248,
+        "processed_text": "hello I have a stomach and slight headache  which disease did I get?\u201d\nIn recent years, several studies have been conducted on the association between different types of headaches and psychiatric disorders. One such study published in 2018 focused on analyzing the relationship between headache diagnoses and symptoms with psychiatric comorbidities in a primary care setting. The study involved 500 adult patients who were categorized into four groups based on their headache type: migraine, tension-type headache, chronic daily headache (CDH), and secondary headache. Among these, 62.6% had psychiatric diagnoses, with depression being the most prevalent (25.4%), followed by"
+    },
+    {
+        "model_id": "Camel",
+        "latency_seconds": 5.137708425521851,
+        "model_params": 5047369728,
+        "processed_text": "hello I have a stomach and slight headache  which disease did I get?"
+    }
+]

@@ -1,0 +1,7 @@
+google-cloud-speech 
+google-cloud-texttospeech 
+transformers
+torch
+pydub
+soundfile
+Flask
