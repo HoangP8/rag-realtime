@@ -20,6 +20,7 @@ def load_llm_model(LLM_type):
     if LLM_type == 'gpt2':
         tokenizer = AutoTokenizer.from_pretrained('gpt2')
         model = AutoModelForCausalLM.from_pretrained('gpt2', torch_dtype=torch.float16).to(device)
+        tokenizer.pad_token_id = tokenizer.eos_token_id
         return model, tokenizer
 
 def load_tts_model(TTS_type):
