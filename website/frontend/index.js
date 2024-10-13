@@ -1,4 +1,3 @@
-
 let mediaRecorder;
 let audioChunks = [];
 let audioBlob;

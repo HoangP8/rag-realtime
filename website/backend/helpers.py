@@ -1,20 +1,23 @@
+import os
+from dotenv import load_dotenv
 import soundfile as sf
 from pydub import AudioSegment
 from transformers import pipeline
 from google.cloud import speech, texttospeech
 import torch
-
 from deepgram import (
     PrerecordedOptions,
     FileSource,
 )
 
+load_dotenv()
+INPUT_AUDIO_DIR = os.getenv("INPUT_AUDIO_DIR")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def read_audio_file(file_path):
     # Convert audio to WAV if it's not in WAV format (Google API works best with WAV)
     audio = AudioSegment.from_file(file_path)
-    wav_path = "temp_audio.wav"
+    wav_path = INPUT_AUDIO_DIR + "/temp_audio.wav"
     audio.export(wav_path, format="wav")
 
     return wav_path
@@ -63,10 +66,10 @@ def process_with_llm(transcript, LLM_type, LLM_model, LLM_tokenizer):
             max_length=50,
             num_return_sequences=1,
             no_repeat_ngram_size=2,
-            do_sample=True,
-            top_k=50,
-            top_p=0.95,
-            temperature=1.0,
+            # do_sample=True,
+            # top_k=50,
+            # top_p=0.95,
+            # temperature=1.0,
         )    
         processed_text = LLM_tokenizer.decode(response[0], skip_special_tokens=True)
         return processed_text
@@ -98,5 +101,6 @@ def convert_text_to_speech(text, output_audio_file, TTS_type, TTS_model):
 
 def inference(input_audio_file, output_audio_file, STT_type, LLM_type, TTS_type, STT_model, LLM_model, TTS_model, LLM_tokenizer):
     transcript = transcribe_audio(input_audio_file, STT_type, STT_model)
-    processed_text = process_with_llm(transcript, LLM_type, LLM_model, LLM_tokenizer)
-    return convert_text_to_speech(processed_text, output_audio_file, TTS_type, TTS_model)
+    text_output = process_with_llm(transcript, LLM_type, LLM_model, LLM_tokenizer)
+    voiced_output = convert_text_to_speech(text_output, output_audio_file, TTS_type, TTS_model)
+    return voiced_output

@@ -1,16 +1,25 @@
+import os
+from dotenv import load_dotenv
 from flask import Flask, request, send_file, jsonify
 from helpers import read_audio_file, transcribe_audio, process_with_llm, convert_text_to_speech, inference
 from loaders import load_llm_model, load_stt_model, load_tts_model
-import ffmpeg
 
 # Framework Settings
-input_audio_path = "/home/LENOVO/capstone/backend/input_audio/input_audio.wav"
-fixed_audio_path = "/home/LENOVO/capstone/backend/input_audio/fixed_audio.wav"
-output_audio_path = "/home/LENOVO/capstone/backend/output_audio/output_audio.wav"
+
+load_dotenv()
+INPUT_AUDIO_DIR = os.getenv("INPUT_AUDIO_DIR")
+OUTPUT_AUDIO_DIR = os.getenv("OUTPUT_AUDIO_DIR")
+
+input_audio_path = INPUT_AUDIO_DIR + "/input_audio.wav"
+output_audio_path = OUTPUT_AUDIO_DIR + "/output_audio.wav"
 
 STT_model = load_stt_model("Google")
 LLM_model, LLM_tokenizer = load_llm_model("gpt2")
 TTS_model = load_tts_model("Google")
+
+STT_type = "Google"
+LLM_type = "gpt2"
+TTS_type = "Google"
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = "recordings/"
@@ -30,10 +39,23 @@ def upload():
     TTS_type = request.form.get('TTS_type')
     
     audio.save(input_audio_path)
-    ffmpeg.input(input_audio_path).output(fixed_audio_path, format='wav').run(overwrite_output=True)
-    inference(fixed_audio_path, output_audio_path, STT_type, LLM_type, TTS_type, STT_model, LLM_model, TTS_model, LLM_tokenizer)
+    inference(read_audio_file(input_audio_path), output_audio_path, STT_type, LLM_type, TTS_type, STT_model, LLM_model, TTS_model, LLM_tokenizer)
     return send_file(output_audio_path, mimetype='audio/wav')
 
+@app.route('/setting', methods=['POST'])
+def saveSetting():
+    global STT_model, LLM_model, TTS_model, LLM_tokenizer
+    global STT_type, LLM_type, TTS_type
+
+    data = request.get_json()
+    STT_type = data['STT_type']
+    LLM_type = data['LLM_type']
+    TTS_type = data['TTS_type']
+
+    STT_model = load_stt_model(STT_type)
+    LLM_model, LLM_tokenizer = load_llm_model(LLM_type)
+    TTS_model = load_tts_model(TTS_type)
+    return "success", 200
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
@@ -44,8 +66,7 @@ def transcribe():
     STT_type = request.form.get('STT_type')
     
     audio.save(input_audio_path)
-    ffmpeg.input(input_audio_path).output(fixed_audio_path, format='wav').run(overwrite_output=True)
-    transcript = transcribe_audio(fixed_audio_path, STT_type, STT_model)
+    transcript = transcribe_audio(read_audio_file(input_audio_path), STT_type, STT_model)
     return jsonify({"transcript": transcript})
 
 @app.route('/llmresponse', methods=['POST'])

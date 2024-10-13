@@ -19,6 +19,16 @@
             }
             console.log(`TTS_type: ${TTS_type}, LLM_type: ${LLM_type}, STT_type: ${STT_type}`);
         }
+
+        async function saveSetting() {
+            const response = await fetch('https://machinelearning.vinunilegacy.com/api/setting', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json' // Indicate JSON content type
+                },
+                body: JSON.stringify({TTS_type, LLM_type, STT_type})
+            });
+        }
     </script>
 </head>
 <body>
@@ -38,7 +48,7 @@
         <label><input type="radio" name="STT" value="Google" onclick="updateModel('STT', 'Google')" checked> Google</label><br>
         <label><input type="radio" name="STT" value="Deepgram" onclick="updateModel('STT', 'Deepgram')"> Deepgram</label><br>
         <!-- <label><input type="radio" name="STT" value="Microsoft" onclick="updateModel('STT', 'Microsoft')"> Microsoft</label><br> -->
-    
+        <button id="saveSettings" onclick="saveSetting()">Save</button>
     </div>
     <div>
         <h2>End2end testing:</h2>
@@ -81,6 +91,6 @@
     <button id="connectAPI" >Connect</button>
     <button id="startTranscribe" >Start Transcribing</button>
     <button id="stopTranscribe" disabled>Stop Transcribing</button>
-    <script src="index.js?23"></script>
+    <script src="index.js?24"></script>
 </body>
 </html>
