@@ -22,6 +22,7 @@ const getTranscriptButton = document.getElementById('getTranscriptButton');
 const responseLLM = document.getElementById('responseLLM');
 const timeTakenLLM = document.getElementById('timeTakenLLM');
 const getLLMResponse = document.getElementById('getLLMResponse');
+const getLLMStreamingResponse = document.getElementById('getLLMStreamingResponse');
 
 const audioResponseTTS = document.getElementById('audioResponseTTS');
 const timeTakenTTS = document.getElementById('timeTakenTTS');
@@ -181,4 +182,38 @@ getTTSResponse.addEventListener('click', async () => {
     const endTime = performance.now();
     const timeTaken = Math.round(endTime - startTime);
     timeTakenTTS.textContent = timeTaken / 1000;
+});
+
+getLLMStreamingResponse.addEventListener('click', async () => {
+    responseLLM.textContent == ""
+    const startTime = performance.now();
+
+    // Make the Deepgram API request
+    const response = await fetch('https://machinelearning.vinunilegacy.com/api/llmresponse/stream', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json' // Indicate JSON content type
+        },
+        body: JSON.stringify({"transcript": transcriptSTT.textContent, "LLM_type": LLM_type})
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+    
+    let flag = 0
+    while (!done) {
+        const { value, done: streamDone } = await reader.read();
+        done = streamDone;
+        const chunk = decoder.decode(value);
+        responseLLM.textContent += chunk;
+        if (flag == 0 && responseLLM.textContent == "") {
+            flag = 1
+            // Calc time takn
+            const endTime = performance.now();
+            const timeTaken = Math.round(endTime - startTime);
+            timeTakenLLM.textContent = timeTaken / 1000;
+        }
+    }
+
 });

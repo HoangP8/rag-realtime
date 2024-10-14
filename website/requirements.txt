@@ -9,3 +9,4 @@ ffmpeg-python
 deepgram-sdk
 python-dotenv
 sentencepiece
+openai

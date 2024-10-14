@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, request, send_file, jsonify
-from helpers import read_audio_file, transcribe_audio, process_with_llm, convert_text_to_speech, inference
+from flask import Flask, request, send_file, jsonify, Response
+from helpers import read_audio_file, transcribe_audio, process_with_llm, convert_text_to_speech, inference, streaming_process_with_llm
 from loaders import load_llm_model, load_stt_model, load_tts_model
 
 # Framework Settings
@@ -77,6 +77,15 @@ def llmresponse():
 
     response = process_with_llm(transcript, LLM_type, LLM_model, LLM_tokenizer)
     return jsonify({"response": response})
+
+@app.route('/llmresponse/stream', methods=['POST'])
+def llmStreamingResponse():
+    data = request.get_json()
+    transcript = data['transcript']
+    LLM_type = data['LLM_type']
+
+    response = streaming_process_with_llm(transcript, LLM_type, LLM_model)
+    return Response(response, content_type='text/plain')
 
 @app.route('/voiceresponse', methods=['POST'])
 def voiceresponse():

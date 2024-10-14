@@ -28,6 +28,14 @@
                 },
                 body: JSON.stringify({TTS_type, LLM_type, STT_type})
             });
+            if (LLM_type == "gpt-4o-mini"){
+                const getLLMStreamingResponse = document.getElementById('getLLMStreamingResponse');
+                getLLMStreamingResponse.disabled = false;
+            }
+            else {
+                const getLLMStreamingResponse = document.getElementById('getLLMStreamingResponse');
+                getLLMStreamingResponse.disabled = true;
+            }
         }
     </script>
 </head>
@@ -42,7 +50,7 @@
         <h3>Choose an LLM model</h3>
         <label><input type="radio" name="LLM" value="gpt2" onclick="updateModel('LLM', 'gpt2')" checked> GPT-2</label><br>
         <!-- <label><input type="radio" name="LLM" value="gpt3" onclick="updateModel('LLM', 'gpt3')"> GPT-3</label><br> -->
-        <label><input type="radio" name="LLM" value="2.7B-llama3" onclick="updateModel('LLM', '2.7B-llama3')"> 2.7B-llama3</label><br>
+        <label><input type="radio" name="LLM" value="gpt-4o-mini" onclick="updateModel('LLM', 'gpt-4o-mini')"> gpt-4o-mini</label><br>
     
         <h3>Choose a STT model</h3>
         <label><input type="radio" name="STT" value="Google" onclick="updateModel('STT', 'Google')" checked> Google</label><br>
@@ -74,6 +82,7 @@
     <div>
         <h3>LLM response:</h3>
         <button id="getLLMResponse">Get Reponse</button>
+        <button id="getLLMStreamingResponse" disabled>Get Streaming Reponse</button>
         <h4>Transcript: <span id="responseLLM"></span></h4>
         <h4>Time taken: <span id="timeTakenLLM"></span> seconds</h4>
     </div>
@@ -91,6 +100,6 @@
     <button id="connectAPI" >Connect</button>
     <button id="startTranscribe" >Start Transcribing</button>
     <button id="stopTranscribe" disabled>Stop Transcribing</button>
-    <script src="index.js?24"></script>
+    <script src="index.js?27"></script>
 </body>
 </html>

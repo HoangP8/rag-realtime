@@ -58,6 +58,22 @@ def transcribe_audio(file_path, STT_type, STT_model):
         return transcript
     return 404
 
+def streaming_process_with_llm(transcript, LLM_type, LLM_model):
+    if (LLM_type == "gpt-4o-mini"):
+        response = LLM_model.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": transcript}],
+            stream=True,
+            max_tokens=150,  # You can adjust the token limit as needed
+            temperature=0.7,
+        )
+
+        for chunk in response:
+            if 'choices' in chunk and len(chunk['choices']) > 0:
+                content = chunk['choices'][0].get('delta', {}).get('content', '')
+                if content: 
+                    yield f"{content}"
+
 def process_with_llm(transcript, LLM_type, LLM_model, LLM_tokenizer):
     if (LLM_type == "gpt2"):
         transcript_tokens = LLM_tokenizer.encode(transcript, return_tensors='pt').to(device)
@@ -75,7 +91,16 @@ def process_with_llm(transcript, LLM_type, LLM_model, LLM_tokenizer):
         )    
         processed_text = LLM_tokenizer.decode(response[0], skip_special_tokens=True)
         return processed_text
-    
+    elif (LLM_type == "gpt-4o-mini"):
+        response = LLM_model.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": transcript}],
+            max_tokens=150,  # You can adjust the token limit as needed
+            temperature=0.7,
+        )
+
+        return response['choices'][0]['message']['content']
+        
 def convert_text_to_speech(text, output_audio_file, TTS_type, TTS_model):
     if TTS_type == "Google":
         synthesis_input = texttospeech.SynthesisInput(text=text)
