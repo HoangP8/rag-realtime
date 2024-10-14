@@ -49,12 +49,12 @@
     
         <h3>Choose an LLM model</h3>
         <label><input type="radio" name="LLM" value="gpt2" onclick="updateModel('LLM', 'gpt2')" checked> GPT-2</label><br>
-        <!-- <label><input type="radio" name="LLM" value="gpt3" onclick="updateModel('LLM', 'gpt3')"> GPT-3</label><br> -->
         <label><input type="radio" name="LLM" value="gpt-4o-mini" onclick="updateModel('LLM', 'gpt-4o-mini')"> gpt-4o-mini</label><br>
+        <label><input type="radio" name="LLM" value="llama3.1-70b" onclick="updateModel('LLM', 'llama3.1-70b')"> llama3.1-70b</label><br>
     
         <h3>Choose a STT model</h3>
         <label><input type="radio" name="STT" value="Google" onclick="updateModel('STT', 'Google')" checked> Google</label><br>
-        <label><input type="radio" name="STT" value="Deepgram" onclick="updateModel('STT', 'Deepgram')"> Deepgram</label><br>
+        <!-- <label><input type="radio" name="STT" value="Deepgram" onclick="updateModel('STT', 'Deepgram')"> Deepgram</label><br> -->
         <!-- <label><input type="radio" name="STT" value="Microsoft" onclick="updateModel('STT', 'Microsoft')"> Microsoft</label><br> -->
         <button id="saveSettings" onclick="saveSetting()">Save</button>
     </div>

@@ -93,14 +93,21 @@ def process_with_llm(transcript, LLM_type, LLM_model, LLM_tokenizer):
         return processed_text
     elif (LLM_type == "gpt-4o-mini"):
         response = LLM_model.chat.completions.create(
-            model="gpt-4o-mini",
+            model="LLM_type",
             messages=[{"role": "user", "content": transcript}],
             max_tokens=150,  # You can adjust the token limit as needed
             temperature=0.7,
         )
 
         return response['choices'][0]['message']['content']
-        
+    elif (LLM_type == "llama3.1-70b"):
+        response = LLM_model.chat.completions.create(
+            model=LLM_type,
+            messages=[{"role": "user", "content": transcript}],
+            max_tokens=150,  # You can adjust the token limit as needed
+            temperature=0.7,
+        )
+        return response['choices'][0]['message']['content']
 def convert_text_to_speech(text, output_audio_file, TTS_type, TTS_model):
     if TTS_type == "Google":
         synthesis_input = texttospeech.SynthesisInput(text=text)

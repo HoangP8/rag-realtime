@@ -14,6 +14,7 @@ DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 OPENAI_ORG_ID = os.getenv("OPENAI_ORG_ID")
 OPENAI_PROJ_ID = os.getenv("OPENAI_PROJ_ID")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+LLAMA_API_KEY = os.getenv("LLAMA_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
 
@@ -31,6 +32,12 @@ def load_llm_model(LLM_type):
         return model, tokenizer
     elif LLM_type == 'gpt-4o-mini': 
         client = openai.OpenAI()
+        return client, None
+    elif LLM_type == 'llama3.1-70b':
+        client = openai.OpenAI(
+            api_key = LLAMA_API_KEY,
+            base_url = "https://api.llama-api.com"
+        )
         return client, None
         
 def load_tts_model(TTS_type):
