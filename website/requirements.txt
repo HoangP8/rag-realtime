@@ -1,0 +1,12 @@
+google-cloud-speech 
+google-cloud-texttospeech 
+transformers
+torch
+pydub
+soundfile
+Flask
+ffmpeg-python
+deepgram-sdk
+python-dotenv
+sentencepiece
+openai
