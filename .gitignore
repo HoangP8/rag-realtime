@@ -4,3 +4,7 @@ obj/
 .DS_Store
 __pycache__
 venv310
+
+realtime-playground/
+build-api/
+kno2gether-webrtc-agent/
