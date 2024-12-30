@@ -1,65 +1,49 @@
-import logging
+from __future__ import annotations
 
+import logging
 from dotenv import load_dotenv
+
+from livekit import rtc
 from livekit.agents import (
     AutoSubscribe,
     JobContext,
-    JobProcess,
     WorkerOptions,
     cli,
     llm,
 )
-from livekit.agents.pipeline import VoicePipelineAgent
-from livekit.plugins import openai, deepgram, silero
-
+from livekit.agents.multimodal import MultimodalAgent
+from livekit.plugins import openai
 
 load_dotenv(dotenv_path=".env.local")
 logger = logging.getLogger("voice-agent")
-
-
-def prewarm(proc: JobProcess):
-    proc.userdata["vad"] = silero.VAD.load()
-
+logger.setLevel(logging.INFO)
 
 async def entrypoint(ctx: JobContext):
-    initial_ctx = llm.ChatContext().append(
-        role="system",
-        text=(
-            "You are a voice assistant created by LiveKit. Your interface with users will be voice. "
-            "You should use short and concise responses, and avoiding usage of unpronouncable punctuation. "
-            "You were created as a demo to showcase the capabilities of LiveKit's agents framework."
-        ),
-    )
+    logger.info("starting entrypoint")
 
-    logger.info(f"connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-    # Wait for the first participant to connect
     participant = await ctx.wait_for_participant()
-    logger.info(f"starting voice assistant for participant {participant.identity}")
 
-    # This project is configured to use Deepgram STT, OpenAI LLM and TTS plugins
-    # Other great providers exist like Cartesia and ElevenLabs
-    # Learn more and pick the best one for your app:
-    # https://docs.livekit.io/agents/plugins
-    assistant = VoicePipelineAgent(
-        vad=ctx.proc.userdata["vad"],
-        stt=deepgram.STT(),
-        llm=openai.LLM(model="gpt-4o-mini"),
-        tts=openai.TTS(),
-        chat_ctx=initial_ctx,
+    model = openai.realtime.RealtimeModel(
+        instructions="You are a helpful assistant that is specialized for medical queries. Please start the conversation with the user by asking them how they are feeling.",
+        voice="echo",
+        temperature=0.8,
+        modalities=["audio", "text"],
     )
+    assistant = MultimodalAgent(model=model)
+    assistant.start(ctx.room)
 
-    assistant.start(ctx.room, participant)
+    logger.info("starting agent")
 
-    # The agent should be polite and greet the user when it joins :)
-    await assistant.say("Hey, how can I help you today?", allow_interruptions=True)
-
+    session = model.sessions[0]
+    session.conversation.item.create(
+      llm.ChatMessage(
+        role="system",
+        content="You are a voice assistant created for medical purposes. You should be able to speak fluent English and Vietnamese. You should use short and concise responses, and avoiding usage of unpronouncable punctuation. You should give precise diagnoses and treatment suggestions because medical advices are sensitive and very important."
+      )
+    )
+    session.response.create()
 
 if __name__ == "__main__":
-    cli.run_app(
-        WorkerOptions(
-            entrypoint_fnc=entrypoint,
-            prewarm_fnc=prewarm,
-        ),
-    )
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
