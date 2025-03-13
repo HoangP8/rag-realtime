@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from functools import partial
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
-# from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from livekit import rtc
 from livekit.agents import (
     AutoSubscribe,
@@ -23,9 +23,8 @@ from livekit.plugins import openai as livekit_openai
 # load environment variables
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("voice-agent")
 
-# FAISS path
+logger = logging.getLogger("voice-agent")
 FAISS_PATH = os.path.join(os.path.dirname(__file__), "..", "rag", "faiss")
 
 # transcribe audio using Whisper
@@ -70,13 +69,13 @@ async def voice_agent(ctx: JobContext, embedding_model: str, model_type: str):
     faiss_path = os.path.join(FAISS_PATH, embedding_model.replace('/', '_'))
     if model_type == "openai":
         embedding_function = OpenAIEmbeddings(model=embedding_model)
-    # elif model_type == "huggingface":
-    #     embedding_function = HuggingFaceEmbeddings(model_name=embedding_model)
+    elif model_type == "huggingface":
+        embedding_function = HuggingFaceEmbeddings(model_name=embedding_model)
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
     faiss_db = FAISS.load_local(faiss_path, embedding_function, allow_dangerous_deserialization=True)
     logger.info(f"Loaded FAISS database at {faiss_path}")
-    breakpoint()
+
     # multimodal agent
     assistant = MultimodalAgent(model=model)
     assistant.start(ctx.room)
@@ -148,21 +147,19 @@ async def voice_agent(ctx: JobContext, embedding_model: str, model_type: str):
 
 # Entrypoint function defined at module level
 async def entrypoint(ctx: JobContext, embedding_model: str, model_type: str):
-    breakpoint()
     await voice_agent(ctx, embedding_model=embedding_model, model_type=model_type)
 
 
 if __name__ == "__main__":
     # Parse custom arguments manually without interfering with cli.run_app
-    embedding_model = "text-embedding-3-small"  # Default
-    model_type = "openai"  # Default
-    args = sys.argv[1:]  # Get all arguments after script name
-
-    # Simple manual parsing for --embedding-model and --model-type
+    embedding_model = "text-embedding-3-small" 
+    model_type = "openai"  
+    args = sys.argv[1:]  
+    
+    # manual parsing for --embedding-model and --model-type
     i = 0
     while i < len(args):
         if args[i] == "--embedding-model" and i + 1 < len(args):
-            embedding_model = args[i + 1]
             i += 2
         elif args[i] == "--model-type" and i + 1 < len(args):
             model_type = args[i + 1]
@@ -174,5 +171,10 @@ if __name__ == "__main__":
     entrypoint_with_args = partial(entrypoint, embedding_model=embedding_model, model_type=model_type)
 
     # Create WorkerOptions with the bound entrypoint
-    worker_options = WorkerOptions(entrypoint_fnc=entrypoint_with_args)
+    worker_options = WorkerOptions(
+        entrypoint_fnc=entrypoint_with_args,
+        ws_url=os.getenv("LIVEKIT_URL"),
+        api_key=os.getenv("LIVEKIT_API_KEY"),
+        api_secret=os.getenv("LIVEKIT_API_SECRET")
+    )
     cli.run_app(worker_options)
