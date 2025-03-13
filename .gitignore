@@ -6,50 +6,55 @@
 *.pem
 
 # Python (Backend)
-venv/
+/backend/venv/  # Adjust path if venv is elsewhere
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
 # Node.js (Frontend & Backend)
-node_modules/
-.pnp/
-.pnp.js
-.yarn/install-state.gz
+/frontend/node_modules/
+/backend/node_modules/  # Add if backend uses Node.js
+/frontend/.pnp/
+/frontend/.pnp.js
+/frontend/.yarn/install-state.gz
 
 # Build artifacts
-/dist/
-/build/
-/.next/
-/out/
+/frontend/dist/
+/frontend/build/
+/frontend/.next/
+/frontend/out/
+/backend/build/  # Add if backend has build artifacts
 
 # Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+/backend/*.log  # Add if backend generates logs
 
 # Coverage reports
-/coverage/
+/frontend/coverage/
+/backend/coverage/  # Add if backend has coverage reports
 
 # OS-specific files
 .DS_Store
 Thumbs.db
 
 # TypeScript
-*.tsbuildinfo
-next-env.d.ts
+/frontend/*.tsbuildinfo
+/frontend/next-env.d.ts
 
 # Vercel deployment
-.vercel
+/frontend/.vercel
 
 # Misc
 .idea/
 .vscode/
 
 # FAISS index and related files
-faiss/
-index.faiss
-index.pkl
+backend/faiss/
+backend/index.faiss
+backend/index.pkl
 
-*.log 
+# Global log files
+*.log
