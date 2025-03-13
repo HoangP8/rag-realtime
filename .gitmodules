@@ -1,0 +1,3 @@
+[submodule "application-frontend"]
+	path = application-frontend
+	url = https://github.com/Crusty-Banana/capstone-frontend.git
