@@ -17,7 +17,7 @@ load_dotenv(dotenv_path=dotenv_path)
 openai.api_key = os.environ['OPENAI_API_KEY']
 FAISS_PATH = "faiss"
 DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
-breakpoint()
+
 log_dir = 'result'
 log_file = os.path.join(log_dir, 'chunk_latency.log')
 os.makedirs(log_dir, exist_ok=True)
