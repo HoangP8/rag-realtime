@@ -41,16 +41,19 @@ class AssistantFnc(llm.FunctionContext):
     async def process_pdf(
         self,
         query: Annotated[str, llm.TypeInfo(description="Query to search within the PDFs")],
+        model_name: Annotated[str, llm.TypeInfo(description="The model name to use for embeddings")],
     ) -> str:
         """Query FAISS index and return relevant text."""
-        index_path = "faiss_index.bin"
-        texts_path = "texts.pkl"
+        # Construct the model-specific paths
+        index_path = os.path.join("faiss", model_name, f"faiss_index_{model_name}.bin")
+        texts_path = os.path.join("faiss", model_name, f"texts_{model_name}.pkl")
         
         faiss_index, texts = load_vectorstore(index_path, texts_path)
-        query_embedding_response = await openai.create_embeddings(input=[query], model="text-embedding-ada-002")
+        
+        # Generate the query embedding for the given model
+        query_embedding_response = await openai.create_embeddings(input=[query], model=model_name)
         query_embedding = np.array(query_embedding_response[0].embedding).astype('float32')
 
-        
         # Search for the most relevant chunk
         D, I = faiss_index.search(query_embedding.reshape(1, -1), k=1)
         relevant_text = texts[I[0][0]]
@@ -62,6 +65,7 @@ class AssistantFnc(llm.FunctionContext):
         )
         return response['text']
 
+
 # Main Worker EntryPoint
 async def entrypoint(ctx: JobContext):
     logger.info("starting entrypoint")
@@ -69,12 +73,12 @@ async def entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
 
     fnc_ctx = AssistantFnc()
-
+    
     query = "What is the main topic of these documents?"
     
-    # Call the process_pdf function with the query
-    result = await fnc_ctx.process_pdf(query=query)
-    logger.info(f"Generated response: {result}")
+    model_name = "text-embedding-ada-002"
+    result = await fnc_ctx.process_pdf(query=query, model_name=model_name)
+    logger.info(f"Generated response for {model_name}: {result}")
 
     # Initialize and start the assistant
     model = openai.realtime.RealtimeModel(
