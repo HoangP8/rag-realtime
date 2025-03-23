@@ -1,102 +1,141 @@
 from __future__ import annotations
 import logging
 import os
-import pickle
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Annotated
-import numpy as np
-import faiss
-from livekit.agents import (
-    AutoSubscribe,
-    JobContext,
-    WorkerOptions,
-    cli,
-    llm,
-)
+
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
 from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
 
-# Load environment variables
+# Basic setup
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
 logger = logging.getLogger("voice-agent")
 logger.setLevel(logging.INFO)
 
-# Load FAISS index and text chunks from pre-existing files
-def load_vectorstore(index_path: str, texts_path: str):
-    """Load FAISS index and text chunks from disk."""
-    if not os.path.exists(index_path) or not os.path.exists(texts_path):
-        raise FileNotFoundError("FAISS index or texts file not found.")
+def load_vectorstore(model_name: str):
+    """Load FAISS vector store from disk."""
     
-    faiss_index = faiss.read_index(index_path)
-    with open(texts_path, "rb") as f:
-        texts = pickle.load(f)
+    backend_dir = Path(__file__).parent.absolute()
+    model_folder = backend_dir / "faiss" / model_name
     
-    return faiss_index, texts
+    if not os.path.exists(model_folder):
+        logger.error(f"Vector store not found: {model_folder}")
+        return None
+    
+    embeddings = OpenAIEmbeddings(model=model_name)
+    return FAISS.load_local(str(model_folder), embeddings, allow_dangerous_deserialization=True)
 
-# Function Context with RAG for PDF processing
+
 class AssistantFnc(llm.FunctionContext):
-    
     @llm.ai_callable()
     async def process_pdf(
         self,
         query: Annotated[str, llm.TypeInfo(description="Query to search within the PDFs")],
         model_name: Annotated[str, llm.TypeInfo(description="The model name to use for embeddings")],
     ) -> str:
-        """Query FAISS index and return relevant text."""
-        # Construct the model-specific paths
-        index_path = os.path.join("faiss", model_name, f"faiss_index_{model_name}.bin")
-        texts_path = os.path.join("faiss", model_name, f"texts_{model_name}.pkl")
+        """Find relevant medical info in documents and return an answer."""
         
-        faiss_index, texts = load_vectorstore(index_path, texts_path)
+        vectorstore = load_vectorstore(model_name)
+        if not vectorstore:
+            return "Failed to load the vector store."
         
-        # Generate the query embedding for the given model
-        query_embedding_response = await openai.create_embeddings(input=[query], model=model_name)
-        query_embedding = np.array(query_embedding_response[0].embedding).astype('float32')
-
-        # Search for the most relevant chunk
-        D, I = faiss_index.search(query_embedding.reshape(1, -1), k=1)
-        relevant_text = texts[I[0][0]]
+        # get relevant documents
+        docs = vectorstore.similarity_search(query, k=2)
+        if not docs:
+            return "No relevant information found."
         
-        # Generate a response based on the relevant context
-        response = openai.realtime.RealtimeModel.generate(
-            prompt=f"Context: {relevant_text}\n\nUser's Query: {query}\nAnswer:",
-            max_tokens=150
-        )
-        return response['text']
+        # prepare context and generate response
+        context = "\n\n".join(doc.page_content for doc in docs)
+        llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+        prompt = f"""Context: {context}\n\nQuery: {query}\n\nAnswer based on the context:"""
+        
+        response = llm.invoke(prompt)
+        return response.content
 
 
-# Main Worker EntryPoint
+class MedicalAssistant(MultimodalAgent):
+    """Custom assistant that adds RAG capabilities to voice interactions."""
+    
+    def __init__(self, model, fnc_ctx):
+        super().__init__(model=model, fnc_ctx=fnc_ctx)
+        self.model_name = "text-embedding-3-small"
+        
+        # medical terms that trigger RAG
+        self.medical_terms = [
+            "lao", "tuberculosis", "tb", "cough", "fever", 
+            "đau", "sốt", "ho", "sụt cân", "khó thở"
+        ]
+    
+    async def on_transcript(self, transcript, participant_identity=None):
+        """Process user speech and trigger RAG when medical terms are detected."""
+        if transcript and any(term in transcript.lower() for term in self.medical_terms):
+            
+            logger.info(f"Medical term detected in: '{transcript}', performing RAG")
+            
+            # perform RAG for medical queries
+            result = await self.fnc_ctx.process_pdf(query=transcript, model_name=self.model_name)
+            
+            # add RAG context to the conversation
+            session = self.model.sessions[0]
+            session.conversation.item.create(
+                llm.ChatMessage(
+                    role="system",
+                    content=f"Medical information: {result}"
+                )
+            )
+        
+        await super().on_transcript(transcript, participant_identity)
+
+
 async def entrypoint(ctx: JobContext):
-    logger.info("starting entrypoint")
+    """Main entry point for the medical assistant."""
+    
+    # initialize connection
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    participant = await ctx.wait_for_participant()
+    await ctx.wait_for_participant()
 
+    # function context
     fnc_ctx = AssistantFnc()
     
-    query = "What is the main topic of these documents?"
-    
-    model_name = "text-embedding-ada-002"
-    result = await fnc_ctx.process_pdf(query=query, model_name=model_name)
-    logger.info(f"Generated response for {model_name}: {result}")
-
-    # Initialize and start the assistant
+    # initialize voice model
     model = openai.realtime.RealtimeModel(
-        instructions="You are a helpful assistant that is specialized for medical queries. Please start the conversation with the user by asking them how they are feeling.",
+        instructions="""You are a medical assistant specializing in tuberculosis.
+        
+        IMPORTANT - LANGUAGE SELECTION:
+        - If the user speaks in Vietnamese, respond ONLY in Vietnamese.
+        - If the user speaks in English, respond ONLY in English.
+        - Never mix languages in the same response.
+        - Never translate your response to both languages.
+        
+        Keep responses concise and accurate. Provide medical information clearly and with confidence.""",
         voice="echo",
-        temperature=0.8,
+        temperature=0.7,
         modalities=["audio", "text"],
     )
-    assistant = MultimodalAgent(model=model, fnc_ctx=fnc_ctx)
+    
+    # custom assistant with RAG
+    assistant = MedicalAssistant(model=model, fnc_ctx=fnc_ctx)
     assistant.start(ctx.room)
 
-    logger.info("starting agent")
-
+    # system message
     session = model.sessions[0]
     session.conversation.item.create(
         llm.ChatMessage(
             role="system",
-            content="You are a voice assistant created for medical purposes. You should be able to speak fluent English and Vietnamese. You should use short and concise responses, avoiding unpronounceable punctuation. You should give precise diagnoses and treatment suggestions because medical advice is sensitive and very important."
+            content="""You are a medical voice assistant specializing in tuberculosis, be concise and straightforward.
+
+            RULE: Respond ONLY in the language the user is using. Do not provide translations.
+            - If user speaks Vietnamese → respond in Vietnamese
+            - If user speaks English → respond in English
+            
+            First message to user should be a greeting that works in both languages, like: "Hello! How can I help you today? Xin chào! Bạn có khỏe không?"
+            
+            After the greeting, strictly stick to the user's language.
+            """
         )
     )
     session.response.create()
