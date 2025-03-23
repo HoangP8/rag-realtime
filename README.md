@@ -27,6 +27,11 @@ Copy and rename `.env.example` to `.env.local` and filling in the required value
 - `OPENAI_API_KEY`
 - `DEEPGRAM_API_KEY`
 
+Create the vector store from your PDF data:
+```
+python pdf_to_faiss.py
+```
+
 Run the backend agent:
 ```
 python agent.py dev
