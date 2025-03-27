@@ -13,15 +13,26 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
 def create_vector_store(pdf_dir: Path, model_name: str) -> FAISS:
     """Create vector store from PDF documents using specified embedding model."""
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=64)
+    pdf_dir = Path(pdf_dir)
     
-    documents = [
-        doc
-        for pdf_file in pdf_dir.glob("*.pdf")
-        for doc in PyPDFLoader(str(pdf_file)).load()
-    ]
+    # Track PDF processing
+    documents = []
+    pdf_files = list(pdf_dir.glob("*.pdf"))
+    print(f"\nProcessing {len(pdf_files)} PDF files...")
+    
+    for pdf_file in pdf_files:
+        print(f"Loading: {pdf_file.name}")
+        docs = PyPDFLoader(str(pdf_file)).load()
+        documents.extend(docs)
+        print(f"  - Pages: {len(docs)}")
+    
+    print(f"\nTotal pages across all PDFs: {len(documents)}")
     
     splits = text_splitter.split_documents(documents)
+    print(f"Total chunks after splitting: {len(splits)}")
+    print(f"Creating embeddings using model: {model_name}\n")
+    
     embeddings = OpenAIEmbeddings(model=model_name)
     return FAISS.from_documents(splits, embeddings)
 
