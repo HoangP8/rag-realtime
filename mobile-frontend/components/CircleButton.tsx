@@ -22,7 +22,7 @@ export default function CircleButton({ onPress, type }: Prop) {
         <MaterialIcon
           name={type === "audio" ? "multitrack-audio" : "arrow-upward"}
           size={20}
-          color="#25292e"
+          color="#fff"
         />
       </Pressable>
     </View>
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 42,
-    backgroundColor: "#C72127",
+    backgroundColor: "#134D8B",
   },
   buttonSmall: {
     width: 26,

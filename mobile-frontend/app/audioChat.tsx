@@ -1,43 +1,97 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+} from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import {
+  AudioSession,
+  LiveKitRoom,
+  registerGlobals,
+  useLocalParticipant,
+} from "@livekit/react-native";
+
+registerGlobals();
+const wsURL = "wss://clinical-chatbot-1dewlazs.livekit.cloud";
+const token =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDMyODAwODgsImlzcyI6IkFQSURlWWRCTGlDZm5WWiIsIm5iZiI6MTc0MzI3Mjg4OCwic3ViIjoicXVpY2tzdGFydCB1c2VyIDNteml4cyIsInZpZGVvIjp7ImNhblB1Ymxpc2giOnRydWUsImNhblB1Ymxpc2hEYXRhIjp0cnVlLCJjYW5TdWJzY3JpYmUiOnRydWUsInJvb20iOiJxdWlja3N0YXJ0IHJvb20iLCJyb29tSm9pbiI6dHJ1ZX19.Xl9qauBcAm4TgSUaXLM551Icmcude_-hG6-RWcDmetQ";
 
 export default function AudioChat() {
-  const router = useRouter();
-  const [isRecording, setIsRecording] = useState(false);
+  useEffect(() => {
+    let start = async () => {
+      await AudioSession.startAudioSession();
+    };
 
+    start();
+    return () => {
+      AudioSession.stopAudioSession();
+    };
+  }, []);
+  return (
+    <LiveKitRoom
+      serverUrl={wsURL}
+      token={token}
+      connect={true}
+      audio={true}
+      onConnected={() => console.log("Connected to room")}
+      onDisconnected={() => console.log("Disconnected from room")}
+    >
+      <View style={styles.container}>
+        <Text style={styles.title}>Live Audio Chat</Text>
+
+        <ControlButton />
+      </View>
+    </LiveKitRoom>
+  );
+}
+
+function ControlButton() {
+  const router = useRouter();
+  const [isRecording, setIsRecording] = useState(true);
+  const { localParticipant } = useLocalParticipant();
   const startRecording = async () => {
-    setIsRecording(true);
+    try {
+      if (localParticipant) {
+        console.log("Attempting to enable microphone");
+        await localParticipant.setMicrophoneEnabled(true);
+        console.log("Microphone enabled");
+      }
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error enabling microphone:", error);
+    }
   };
 
   const stopRecording = async () => {
+    if (localParticipant) {
+      await localParticipant.setMicrophoneEnabled(false);
+      console.log("Microphone disabled");
+    }
     setIsRecording(false);
   };
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Live Audio Chat</Text>
+    <View style={styles.buttonContainer}>
+      <TouchableOpacity
+        style={[styles.roundButton, isRecording ? styles.recording : null]}
+        onPress={isRecording ? stopRecording : startRecording}
+      >
+        <Ionicons
+          name={isRecording ? "mic" : "mic-off"}
+          size={30}
+          color="#fff"
+        />
+      </TouchableOpacity>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.roundButton, isRecording ? styles.recording : null]}
-          onPress={isRecording ? stopRecording : startRecording}
-        >
-          <Ionicons
-            name={isRecording ? "stop" : "mic"}
-            size={30}
-            color="#fff"
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.roundButton, styles.exitButton]}
-          onPress={() => router.push("/chat")}
-        >
-          <Ionicons name="close" size={30} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[styles.roundButton, styles.exitButton]}
+        onPress={() => router.push("/chat")}
+      >
+        <Ionicons name="close" size={30} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -45,12 +99,12 @@ export default function AudioChat() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
   },
   title: {
-    color: "#fff",
+    color: "#000",
     fontSize: 20,
     marginBottom: 20,
   },
@@ -65,14 +119,14 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#1F1F1F",
+    backgroundColor: "#C32229",
     alignItems: "center",
     justifyContent: "center",
   },
   recording: {
-    backgroundColor: "red",
+    backgroundColor: "#134D8B",
   },
   exitButton: {
-    backgroundColor: "gray",
+    backgroundColor: "#C32229",
   },
 });

@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     alignSelf: "flex-end",
-    backgroundColor: "#1F1F1F",
+    backgroundColor: "#E3E3E5",
     padding: 12,
     borderRadius: 50,
   },
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
   messageText: {
-    color: "#fff",
+    color: "#000",
     fontSize: 16,
   },
   inputContainer: {
@@ -108,11 +108,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 15,
     backgroundColor: "#fff",
-    borderColor: "#C72127",
+    borderColor: "#134D8B",
     borderWidth: 2,
     borderRadius: 30,
-    outlineColor: "#C72127",
-    outline: "none",
     color: "#000",
   },
 });

@@ -59,5 +59,9 @@ backend/index.pkl
 # mobile frontend
 mobile-frontend/node_modules/
 mobile-frontend/android/
+
+# virtual environment
+venv/
+
 # Global log files
 *.log
