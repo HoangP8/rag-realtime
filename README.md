@@ -1,6 +1,16 @@
 # Voice Assistant Project
 
-A full-stack voice assistant application powered by [LiveKit](https://livekit.io/), combining a Python backend and a Next.js frontend.
+
+## 📋 Prerequisites
+Before starting, ensure you have the following installed:
+
+- **Python 3.10+**: [Download Python](https://www.python.org/downloads/)
+- **Node.js 18+**: [Download Node.js](https://nodejs.org/)
+- **pnpm**: Install with `npm install -g pnpm`
+- **API Keys** for:
+  - OpenAI
+  - LiveKit
+  - Deepgram
 
 ## 🚀 Quick Start
 
@@ -11,36 +21,69 @@ git clone https://github.com/your-repo-name.git
 cd your-repo-name
 ```
 
-### 2️⃣ Setup Backend
-Navigate to the backend folder and create a virtual environment:
+### 2️⃣ Install Dependencies
 
+First, install the Python dependencies:
+
+```sh
+pip install -r requirements.txt
 ```
+
+### 3️⃣ Setup Environment
+
+Create and configure your environment variables:
+
+1. Copy `.env.example` to `.env.local` in the project root:
+   ```sh
+   cp .env.example .env.local
+   ```
+
+2. Open `.env.local` and add the required API keys:
+   - `LIVEKIT_URL`
+   - `LIVEKIT_API_KEY`
+   - `LIVEKIT_API_SECRET`
+   - `OPENAI_API_KEY`
+   - `DEEPGRAM_API_KEY` (if using Deepgram)
+
+### 4️⃣ Setup Backend
+
+Navigate to the backend folder:
+
+```sh
 cd backend
-pip install -r ../requirements.txt
 ```
 
-Copy and rename `.env.example` to `.env.local` and filling in the required values:
-
-- `LIVEKIT_URL`
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
-- `OPENAI_API_KEY`
-- `DEEPGRAM_API_KEY`
-
-Create the vector store from your PDF data:
-```
+Create the vector store from your medical PDF data:
+```sh
 python pdf_to_faiss.py
 ```
 
 Run the backend agent:
-```
+```sh
 python agent.py dev
 ```
 
-### 3️⃣ Setup Frontend
-Navigate to the frontend folder and install dependencies:
-```
+### 5️⃣ Setup Frontend
+
+Open a new terminal, navigate to the frontend folder, and install dependencies:
+
+```sh
 cd frontend
 pnpm install
+```
+
+Start the development server:
+```sh
 pnpm dev
 ```
+
+## 🧩 Project Structure
+
+- `/backend`: Python backend with RAG capabilities and LiveKit integration
+  - `agent.py`: Main voice assistant agent
+  - `pdf_to_faiss.py`: Script to generate vector database from medical PDFs
+  - `/faiss`: Directory containing the vector stores
+
+- `/frontend`: Next.js frontend application
+  - `/app`: Next.js app directory
+  - `/components`: React components
