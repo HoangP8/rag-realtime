@@ -15,6 +15,10 @@ livekit-plugins-openai~=0.10.3
 livekit-plugins-deepgram>=0.6.8
 livekit-plugins-silero~=0.7.1
 python-dotenv~=1.0
+langchain
 langchain_community
 langchain_openai
 langchain_huggingface
+pypdf
+python-dotenv
+faiss-cpu
