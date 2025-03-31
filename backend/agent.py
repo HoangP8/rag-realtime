@@ -106,9 +106,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
         chat_ctx=None,
         fnc_ctx=None,
         transcription=AgentTranscriptionOptions(),
-        max_text_response_retries=5,
         loop=None,
-        noise_cancellation=None,
     ):
         # Create our medical function context
         self.med_fnc_ctx = MedicalFunctionContext(vectorstore=vectorstore)
@@ -124,9 +122,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
             chat_ctx=chat_ctx,
             fnc_ctx=fnc_ctx,
             transcription=transcription,
-            max_text_response_retries=max_text_response_retries,
             loop=loop,
-            noise_cancellation=noise_cancellation,
         )
         
         # Medical terms that trigger RAG (both English and Vietnamese)
