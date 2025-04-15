@@ -1,34 +1,57 @@
 from __future__ import annotations
 import logging
 import os
+import time
 from dotenv import load_dotenv
 from pathlib import Path
-from typing import Annotated
-import re
+from typing import Annotated, Dict, List
 import asyncio
+import langid
+import json
 
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
 from livekit.agents.multimodal import MultimodalAgent, AgentTranscriptionOptions
 from livekit.plugins import openai
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 
 # Basic setup
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
 logger = logging.getLogger("voice-agent")
 logger.setLevel(logging.INFO)
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+log_file_path = Path(__file__).parent / "medical_assistant.log"
+file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+root_logger.addHandler(file_handler)
+
+# Helper function to log 
+def log_with_separator(logger, type_label, content, separator_length=80):
+    separator = "=" * separator_length
+    logger.info(f"{separator}")
+    logger.info(f"{type_label}")
+    if isinstance(content, str):
+        logger.info(json.dumps(content, ensure_ascii=False))
+    else:
+        logger.info(json.dumps(content, ensure_ascii=False, default=str))
+    logger.info(f"{separator}")
 
 
-def load_vectorstore(model_name: str):
-    """Load FAISS vector store from disk."""
+def load_vectorstore(model_name: str, chunk_size: int = 1024):
+    """Load FAISS vector store from disk with specified model and chunk size."""
     
+    start_time = time.time()
     backend_dir = Path(__file__).parent.absolute()
-    model_folder = backend_dir / "faiss" / model_name
-    if not os.path.exists(model_folder):
-        logger.error(f"Vector store not found: {model_folder}")
-        return None
+    model_base_folder = os.path.join(backend_dir, "faiss", f"{model_name}")
+    model_folder = os.path.join(model_base_folder, f"chunk_size_{chunk_size}")
+    
+    logger.info(f"Loading vectorstore from: {model_folder}")
     embeddings = OpenAIEmbeddings(model=model_name)
-    return FAISS.load_local(str(model_folder), embeddings, allow_dangerous_deserialization=True)
+    result = FAISS.load_local(model_folder, embeddings, allow_dangerous_deserialization=True)
+    load_time = time.time() - start_time
+    log_with_separator(root_logger, "SYSTEM", f"Vector store loaded in {load_time:.4f} seconds")
+    return result
 
 
 class MedicalFunctionContext(llm.FunctionContext):
@@ -37,65 +60,98 @@ class MedicalFunctionContext(llm.FunctionContext):
     def __init__(self, vectorstore):
         super().__init__()
         self.vectorstore = vectorstore
+        self.query_metrics: List[Dict] = []
     
     @llm.ai_callable()
     async def search_medical_info(
         self,
         query: Annotated[str, llm.TypeInfo(description="Medical query to search within the documents")],
+        language: Annotated[str, llm.TypeInfo(description="Language of the query (en or vi)")] = "vi",
         k: Annotated[int, llm.TypeInfo(description="Number of relevant documents to retrieve")] = 3,
+        similarity_threshold: Annotated[float, llm.TypeInfo(description="Minimum similarity score to consider a document relevant")] = 0.75,
     ) -> str:
-        """
-        Search the medical document database for information relevant to health-related queries.
-        Uses GPT-4o to synthesize the information into a coherent response.
-        """
+        """RAG search for medical information, with a similarity threshold."""
         
-        if not self.vectorstore:
-            return "I couldn't access the medical database. Please try again later."
+        metrics = {
+            "query": query,
+            "language": language,
+            "k": k,
+            "similarity_threshold": similarity_threshold,
+            "timestamp": time.time(),
+        }
+        total_start_time = time.time()
         
-        # Get relevant documents
-        logger.info(f"Searching medical info for: '{query}' with k={k}")
-        docs = self.vectorstore.similarity_search(query, k=k)
+        # Log the query
+        log_with_separator(root_logger, "USER QUERY", f"Query: {query}\nLanguage: {language}")
         
-        if not docs:
-            return "I couldn't find any relevant medical information in our database."
+        # Get relevant documents - measure retrieval time
+        logger.info(f"Searching medical info for: '{query}' with k={k} and similarity threshold={similarity_threshold}")
+        retrieval_start = time.time()
+        docs_with_scores = self.vectorstore.similarity_search_with_score(query, k=k)
+        retrieval_time = time.time() - retrieval_start
+        metrics["retrieval_time"] = retrieval_time
         
-        # Combine the document content
-        context = "\n\n---\n\n".join([
-            f"Document {i+1}:\n{doc.page_content}" 
-            for i, doc in enumerate(docs)
-        ])
+        # Filter by similarity threshold
+        filtered_docs = [(doc, score) for doc, score in docs_with_scores if score >= similarity_threshold]
+        metrics["total_docs"] = len(docs_with_scores)
+        metrics["filtered_docs"] = len(filtered_docs)
+        if not filtered_docs:
+            metrics["error"] = "No documents above similarity threshold"
+            metrics["total_time"] = time.time() - total_start_time
+            log_with_separator(root_logger, "RAG RESULTS", f"No documents found above threshold {similarity_threshold} for query: '{query}'")
+            logger.info(f"No documents above threshold for query: '{query}'. Model will answer normally.")
+            return ""  
         
-        # Use GPT-4o to generate a response
-        llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+        # Format results for user
+        metrics["doc_count"] = len(filtered_docs)
+        doc_sources = [getattr(doc, 'metadata', {}).get('source', 'Unknown source') for doc, _ in filtered_docs]
+        metrics["doc_sources"] = doc_sources
+        metrics["similarity_scores"] = [float(score) for _, score in filtered_docs]
         
-        # Template prompt
-        prompt = f"""
-        MEDICAL INFORMATION REQUEST
+        # Log found documents
+        doc_info = [f"Document {i+1}: {source}, similarity: {float(filtered_docs[i][1]):.4f}" 
+                   for i, source in enumerate(doc_sources)]
+        doc_info_str = "\n".join(doc_info)
+        log_with_separator(root_logger, "DOCUMENTS FOUND", f"Count: {len(filtered_docs)}\n{doc_info_str}")
         
-        Query: {query}
+        # Add RAG information to response
+        response_parts = []
+        doc_contents = []
+        for i, (doc, score) in enumerate(filtered_docs):
+            content = doc.page_content.strip()
+            response_parts.append(f"RAG Information {i+1}:\n{content}")
+            doc_contents.append(f"Document {i+1} Content:\n{content}")
+        response = "\n\n---\n\n".join(response_parts)
+        log_with_separator(root_logger, "DOCUMENT CONTENTS", "\n\n".join(doc_contents))
+        metrics["rag_response"] = response
         
-        Context from medical database:
-        {context}
+        # Add RAG instructions based on language
+        if language == "vi":
+            rag_instructions = """
+            Hướng dẫn: Đây là thông tin từ cơ sở dữ liệu y tế Việt Nam. 
+            Hãy sử dụng thông tin này để trả lời câu hỏi của người dùng một cách ngắn gọn, chính xác và dễ hiểu bằng tiếng Việt.
+            Có một vài thông tin từ RAG có thể không liên quan đến câu hỏi của người dùng, bạn hãy bỏ qua nó.
+            Hãy chọn lọc thông tin từ RAG mà liên quan đến câu hỏi của người dùng."""
+        else:
+            rag_instructions = """
+            Instructions: This is information from the Vietnamese medical database.
+            Please translate this information and answer to the user's question concisely, accurately, and clearly in English.
+            There may be some information from RAG that is not relevant to the user's question, please ignore it.
+            Please choose the information from RAG that is relevant to the user's question."""
+        response = response + rag_instructions
         
-        Instructions:
-        1. Generate a truthful and accurate response based ONLY on the provided context
-        2. If the information in the context is insufficient, acknowledge limitations
-        3. Format the response in the same language as the query
-        4. Focus on providing clinically accurate information
-        5. Be clear, concise, and patient-friendly in your explanation
-        6. Do not reference the source documents or say things like "according to the documents"
+        # Log metrics
+        total_time = time.time() - total_start_time
+        metrics["total_time"] = total_time
+        log_with_separator(root_logger, "RAG METRICS", f"Performance: Retrieval={retrieval_time:.3f}s, Total={total_time:.3f}s")
+        logger.info(f"Performance: Retrieval={retrieval_time:.3f}s, Total={total_time:.3f}s")
+        self.query_metrics.append(metrics)
         
-        Response:
-        """
-        
-        logger.info("Requesting GPT-4o synthesis of medical information")
-        response = await llm.ainvoke(prompt)
-        logger.info(f"GPT-4o synthesized response:\n{response.content}")
-        return response.content
+        return response
 
 
 class MedicalMultimodalAgent(MultimodalAgent):
-    """Custom MultimodalAgent with medical keyword detection and RAG capabilities."""
+    """Custom MultimodalAgent with RAG capabilities for healthcare queries."""
     
     def __init__(
         self,
@@ -108,14 +164,11 @@ class MedicalMultimodalAgent(MultimodalAgent):
         transcription=AgentTranscriptionOptions(),
         loop=None,
     ):
-        # Create our medical function context
+        # Initialize RAG function context
         self.med_fnc_ctx = MedicalFunctionContext(vectorstore=vectorstore)
-        
-        # If no function context is provided, use our medical one
         if fnc_ctx is None:
             fnc_ctx = self.med_fnc_ctx
         
-        # Initialize the parent MultimodalAgent with all parameters
         super().__init__(
             model=model,
             vad=vad,
@@ -125,91 +178,107 @@ class MedicalMultimodalAgent(MultimodalAgent):
             loop=loop,
         )
         
-        # Medical terms that trigger RAG (both English and Vietnamese)
-        self.medical_terms = [
-            # English terms
-            "tuberculosis", "tb", "cough", "fever", "weight loss", "shortness of breath",
-            "pain", "infection", "symptoms", "treatment", "medicine", "diagnosis",
-            "disease", "vaccine", "blood pressure", "diabetes", "cancer", "virus",
-            
-            # Vietnamese terms
-            "lao", "ho", "sốt", "sụt cân", "khó thở", "đau", "nhiễm trùng", 
-            "triệu chứng", "điều trị", "thuốc", "chẩn đoán", "bệnh", "vắc-xin",
-            "huyết áp", "tiểu đường", "ung thư", "vi rút"
-        ]
-        
+        # State tracking variables
         self.conversation_history = []
         self.current_language = "en"
         self.committed_transcript = None
+        
+        # Speech accumulation
+        self.accumulated_speech = ""
+        self.speech_timer = None
+        self.speech_timeout = 3.0  # Wait for more speech before processing
+        
         self.setup_event_listeners()
     
-    async def process_committed_transcript(self, msg):
-        """Process the committed transcript with RAG capabilities."""
-
-        if not msg or not any(term.lower() in msg.lower() for term in self.medical_terms):
-            logger.info("No medical terms detected in committed transcript.")
-            return
-            
-        # Detect language + extract relevant query
-        self.current_language = self.detect_language(msg)
-        relevant_query = self.extract_relevant_sentence(msg)
-        logger.info(f"Medical term detected in committed transcript: '{msg}', performing RAG")
-        
-        try:
-            # Perform RAG search using the relevant query
-            result = await self.med_fnc_ctx.search_medical_info(query=relevant_query)
-            
-            if result:
-
-                system_template = """
-                As a medical assistant specializing in tuberculosis, provide this information to the user:
-                
-                {result}
-                
-                IMPORTANT RULES:
-                - Respond only in {language}
-                - Be concise and straightforward
-                - You specialize in tuberculosis but can answer related health questions
-                - For non-medical topics (hobbies, history, etc.), politely explain you're a medical assistant
-                """
-                
-                language = "Vietnamese" if self.current_language == "vi" else "English"
-                system_message = system_template.format(result=result, language=language)
-                
-                logger.info(f"Adding RAG information to conversation context")
-                logger.info(f"System message added to agent:\n{system_message}")
-                
-                # Add RAG information to model's conversation context
-                if hasattr(self._model, 'sessions') and self._model.sessions:
-                    session = self._model.sessions[0]
-                    session.conversation.item.create(
-                        llm.ChatMessage(role="system", content=system_message)
-                    )
-                    logger.info("Successfully added RAG information to conversation")
-        except Exception as e:
-            logger.error(f"Error processing medical query: {e}")
-            
     def setup_event_listeners(self):
-        """Setup event listeners for agent events"""
+        """Configure speech event handlers"""
         @self.on("user_speech_committed")
         def on_user_speech_committed(msg):
-            logger.info(f"User speech committed: {msg}")
-            self.conversation_history.append({"role": "user", "content": msg})
-            self.committed_transcript = msg
-            # asyncio.create_task(self.process_committed_transcript(msg))
+            # Record and accumulate speech fragments
+            speech_time = time.time()
+            logger.info(f"User speech committed: {json.dumps(msg, ensure_ascii=False)}")
+            self.conversation_history.append({"role": "user", "content": msg, "timestamp": speech_time})
+            log_with_separator(root_logger, "SPEECH FRAGMENT", msg)
+            
+            # Append to existing speech or start new accumulation
+            self.accumulated_speech = f"{self.accumulated_speech} {msg}" if self.accumulated_speech else msg
+            
+            # Reset speech processing timer
+            if self.speech_timer:
+                self.speech_timer.cancel()
+            self.speech_timer = asyncio.create_task(self._process_after_timeout())
+        
+        @self.on("agent_speech_committed")
+        def on_agent_speech_committed(speech_data):
+            """Capture agent's speech responses"""
+            speech_time = time.time()
+            agent_transcript = speech_data
+            
+            # Add to conversation history
+            self.conversation_history.append({
+                "role": "assistant", 
+                "content": agent_transcript, 
+                "timestamp": speech_time
+            })
+            log_with_separator(root_logger, "AI RESPONSE", agent_transcript)
     
-    def extract_relevant_sentence(self, transcript):
-        """Extract the sentence containing a medical term."""
-        sentences = re.split(r'(?<=[.?!])\s+', transcript)
-        for sentence in sentences:
-            if any(term.lower() in sentence.lower() for term in self.medical_terms):
-                return sentence
-        return transcript
+    async def _process_after_timeout(self):
+        """Process accumulated speech after timeout period."""
+        await asyncio.sleep(self.speech_timeout)
+        complete_utterance = self.accumulated_speech
+        self.accumulated_speech = ""
+        self.committed_transcript = complete_utterance
+        
+        log_with_separator(root_logger, "COMPLETE UTTERANCE", complete_utterance)
+        await self.process_committed_transcript(complete_utterance)
+    
+    async def process_committed_transcript(self, msg):
+        """Apply RAG to user's complete utterance and update conversation context."""
+        process_start = time.time()
+        transcript_metrics = {"transcript": msg, "timestamp": process_start}
+        
+        # Detect language + extract relevant query
+        self.current_language = self.detect_language(msg)
+        transcript_metrics["language"] = self.current_language
+        relevant_query = msg  # Use complete utterance as query
+        
+        logger.info(f"Processing transcript for RAG: {json.dumps(msg, ensure_ascii=False)} in {self.current_language}")
+        log_with_separator(root_logger, "COMPLETE USER SPEECH", 
+                          f"Query: {msg}\nDetected Language: {self.current_language}")
+        
+        # Perform RAG search
+        result = await self.med_fnc_ctx.search_medical_info(
+            query=relevant_query, 
+            language=self.current_language
+        )
+        transcript_metrics["rag_time"] = time.time() - process_start
+        
+        # Add RAG results to conversation context if available
+        if result and len(result.strip()) > 0:
+            logger.info("Adding RAG results to conversation context")
+            log_with_separator(root_logger, "RAG STATUS", "RAG results found and added to conversation")
+            
+            if hasattr(self._model, 'sessions') and self._model.sessions:
+                session = self._model.sessions[0]
+                session.conversation.item.create(
+                    llm.ChatMessage(role="system", content=result)
+                )
+                logger.info("RAG results added to conversation")
+            transcript_metrics["rag_content"] = result
+        else:
+            logger.info("No relevant documents found, using base knowledge")
+            log_with_separator(root_logger, "RAG STATUS", "No relevant documents found. Using base knowledge.")
+            transcript_metrics["no_relevant_info"] = True
+        
+        # Log completion and metrics
+        transcript_metrics["total_process_time"] = time.time() - process_start
+        logger.info(f"Processing completed in {transcript_metrics['total_process_time']:.3f}s")
+        log_with_separator(root_logger, "WAITING FOR AI RESPONSE", msg)
     
     def detect_language(self, text):
-        """Simple language detection for Vietnamese vs English."""
-        vietnamese_chars = set('àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ')
-        if any(char.lower() in vietnamese_chars for char in text):
+        """Detect language of the text."""
+        lang, _ = langid.classify(text)
+        if lang == 'vi':
             return "vi"
         return "en"
     
@@ -218,56 +287,74 @@ class MedicalMultimodalAgent(MultimodalAgent):
         await super().on_transcript(transcript, participant_identity)
 
 
-
 async def entrypoint(ctx: JobContext):
     """Main entry point for the medical assistant."""
     
+    start_time = time.time()
     # Initialize connection
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     await ctx.wait_for_participant()
+    
+    connect_time = time.time() - start_time
+    log_with_separator(root_logger, "SYSTEM STARTUP", f"Connection established in {connect_time:.4f} seconds")
 
     # Load vectorstore
+    vectorstore_start = time.time()
     model_name = "text-embedding-3-small"
-    vectorstore = load_vectorstore(model_name)
-    if not vectorstore:
-        logger.error("Failed to load vectorstore, exiting.")
-        return
+    chunk_size = 1024
+    similarity_threshold = 0.75
+
+    vectorstore = load_vectorstore(model_name, chunk_size)
+    vectorstore_time = time.time() - vectorstore_start
+    log_with_separator(root_logger, "SYSTEM STARTUP", f"Vector store loaded in {vectorstore_time:.4f} seconds with similarity threshold {similarity_threshold}")
     
     # Initialize voice model
+    model_start = time.time()
     model = openai.realtime.RealtimeModel(
-        instructions="""You are a medical assistant specializing in tuberculosis.
-        IMPORTANT - LANGUAGE SELECTION:
-        - If the user speaks in Vietnamese, respond ONLY in Vietnamese.
-        - If the user speaks in English, respond ONLY in English.
-        - You specialize in tuberculosis but can assist with related health questions.
-        - For non-medical topics (like hobbies or history), politely explain you're a medical assistant.
-        Be concise, accurate, and approachable in your responses.""",
+        instructions="""You are a HEALTHCARE ASSISTANT.
+        Your ONLY purpose is to provide healthcare and medical information.
+        You can ONLY work (understand, speak, and answer) in Vietnamese or English.
+        Be CONCISE and SMOOTH in your responses without hesitation, no need to repeat the same thing over and over again.
+        
+        IMPORTANT RULES:
+        1. ONLY answer healthcare/medical questions. For ANY other topics, politely refuse and remind the user
+           that you are a dedicated healthcare assistant.
+        2. If the user speaks in Vietnamese, respond ONLY in Vietnamese.
+        3. If the user speaks in English, respond ONLY in English.
+        4. Be clear, accessible, and concise in your explanations.        
+        """,
         voice="coral",
-        temperature=0.7,
+        temperature=0.6,
         modalities=["audio", "text"],
     )
     
-    # Create and start the assistant
+    model_time = time.time() - model_start
+    log_with_separator(root_logger, "SYSTEM STARTUP", f"Voice model initialized in {model_time:.4f} seconds")
+    
+    # Initialize the assistant
+    assistant_start = time.time()
     assistant = MedicalMultimodalAgent(model=model, vectorstore=vectorstore)
     assistant.start(ctx.room)
     ctx.assistant = assistant
+    assistant_time = time.time() - assistant_start
+    log_with_separator(root_logger, "SYSTEM STARTUP", f"Assistant started in {assistant_time:.4f} seconds")
     
-    # Add initial system message
-    try:
-        session = model.sessions[0]
-        session.conversation.item.create(
-            llm.ChatMessage(
-                role="system",
-                content="""Welcome the user in both English and Vietnamese. After the initial greeting, 
-                detect their language and respond only in that language. Focus on helping with tuberculosis questions.
-                First message to user should be a greeting that works in both languages, like: "Hello! How can I help you today? Xin chào! Bạn có khỏe không?"
-                """
-            )
+    # Initial system message
+    session = model.sessions[0]
+    session.conversation.item.create(
+        llm.ChatMessage(
+            role="system",
+            content="""You are a healthcare assistant in both English and Vietnamese.
+            
+            Your initial greeting should have ONLY this content, then stop to hear the user's response:
+            "Hello! Xin chào!"
+            
+            After this greeting, detect the user's language and respond only in that language.
+            """
         )
-        session.response.create()
-        logger.info("Assistant initialized and ready")
-    except Exception as e:
-        logger.error(f"Error initializing assistant session: {e}")
+    )
+    session.response.create()
+    logger.info("Assistant initialized and ready")
 
 
 if __name__ == "__main__":

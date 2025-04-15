@@ -1,5 +1,3 @@
-google-cloud-speech
-google-cloud-texttospeech
 transformers
 torch
 pydub
@@ -10,6 +8,7 @@ deepgram-sdk
 python-dotenv~=1.0
 sentencepiece
 openai
+datasets
 livekit-agents~=0.10.1
 livekit-plugins-openai~=0.10.3
 livekit-plugins-deepgram>=0.6.8
@@ -19,6 +18,8 @@ langchain
 langchain_community
 langchain_openai
 langchain_huggingface
+langid
 pypdf
 python-dotenv
 faiss-cpu
+SpeechRecognition
