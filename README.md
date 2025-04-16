@@ -23,7 +23,7 @@ cd your-repo-name
 
 ### 2️⃣ Install Dependencies
 
-First, install the Python dependencies:
+First, install the required libraries:
 
 ```sh
 pip install -r requirements.txt
@@ -53,12 +53,18 @@ Navigate to the backend folder:
 cd backend
 ```
 
-Create the vector store from your medical PDF data:
-```sh
-python pdf_to_faiss.py
-```
+To have the vectorstore to RAG, you can choose one of two following ways:
+- Option 1: Generate the vector store locally:
+  ```sh
+  bash vectorstore.sh
+  ```
+- Option 2: Download pre-built vector store:
+  ```sh
+  pip install gdown
+  gdown --folder https://drive.google.com/drive/folders/1TlG4wPt0vxXO938jI3UMDO270ttn-VNk?usp=sharing
+  ```
 
-Run the backend agent:
+After having vectorstore, run the backend agent with RAG:
 ```sh
 python agent.py dev
 ```
@@ -76,14 +82,3 @@ Start the development server:
 ```sh
 pnpm dev
 ```
-
-## 🧩 Project Structure
-
-- `/backend`: Python backend with RAG capabilities and LiveKit integration
-  - `agent.py`: Main voice assistant agent
-  - `pdf_to_faiss.py`: Script to generate vector database from medical PDFs
-  - `/faiss`: Directory containing the vector stores
-
-- `/frontend`: Next.js frontend application
-  - `/app`: Next.js app directory
-  - `/components`: React components

@@ -26,8 +26,8 @@ file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 root_logger.addHandler(file_handler)
 
-# Helper function to log 
 def log_with_separator(logger, type_label, content, separator_length=80):
+    """Log with separator"""
     separator = "=" * separator_length
     logger.info(f"{separator}")
     logger.info(f"{type_label}")
@@ -36,7 +36,6 @@ def log_with_separator(logger, type_label, content, separator_length=80):
     else:
         logger.info(json.dumps(content, ensure_ascii=False, default=str))
     logger.info(f"{separator}")
-
 
 def load_vectorstore(model_name: str, chunk_size: int = 1024):
     """Load FAISS vector store from disk with specified model and chunk size."""
@@ -311,6 +310,7 @@ async def entrypoint(ctx: JobContext):
     # Initialize voice model
     model_start = time.time()
     model = openai.realtime.RealtimeModel(
+        model="gpt-4o-realtime-preview-2024-12-17",
         instructions="""You are a HEALTHCARE ASSISTANT.
         Your ONLY purpose is to provide healthcare and medical information.
         You can ONLY work (understand, speak, and answer) in Vietnamese or English.
