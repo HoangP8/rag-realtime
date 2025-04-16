@@ -52,7 +52,6 @@ def load_vectorstore(model_name: str, chunk_size: int = 1024):
     log_with_separator(root_logger, "SYSTEM", f"Vector store loaded in {load_time:.4f} seconds")
     return result
 
-
 class MedicalFunctionContext(llm.FunctionContext):
     """Function context for medical RAG capabilities."""
     
@@ -148,7 +147,6 @@ class MedicalFunctionContext(llm.FunctionContext):
         
         return response
 
-
 class MedicalMultimodalAgent(MultimodalAgent):
     """Custom MultimodalAgent with RAG capabilities for healthcare queries."""
     
@@ -180,13 +178,6 @@ class MedicalMultimodalAgent(MultimodalAgent):
         # State tracking variables
         self.conversation_history = []
         self.current_language = "en"
-        self.committed_transcript = None
-        
-        # Speech accumulation
-        self.accumulated_speech = ""
-        self.speech_timer = None
-        self.speech_timeout = 3.0  # Wait for more speech before processing
-        
         self.setup_event_listeners()
     
     def setup_event_listeners(self):
@@ -198,14 +189,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
             logger.info(f"User speech committed: {json.dumps(msg, ensure_ascii=False)}")
             self.conversation_history.append({"role": "user", "content": msg, "timestamp": speech_time})
             log_with_separator(root_logger, "SPEECH FRAGMENT", msg)
-            
-            # Append to existing speech or start new accumulation
-            self.accumulated_speech = f"{self.accumulated_speech} {msg}" if self.accumulated_speech else msg
-            
-            # Reset speech processing timer
-            if self.speech_timer:
-                self.speech_timer.cancel()
-            self.speech_timer = asyncio.create_task(self._process_after_timeout())
+            asyncio.create_task(self.process_committed_transcript(msg))
         
         @self.on("agent_speech_committed")
         def on_agent_speech_committed(speech_data):
@@ -221,16 +205,6 @@ class MedicalMultimodalAgent(MultimodalAgent):
             })
             log_with_separator(root_logger, "AI RESPONSE", agent_transcript)
     
-    async def _process_after_timeout(self):
-        """Process accumulated speech after timeout period."""
-        await asyncio.sleep(self.speech_timeout)
-        complete_utterance = self.accumulated_speech
-        self.accumulated_speech = ""
-        self.committed_transcript = complete_utterance
-        
-        log_with_separator(root_logger, "COMPLETE UTTERANCE", complete_utterance)
-        await self.process_committed_transcript(complete_utterance)
-    
     async def process_committed_transcript(self, msg):
         """Apply RAG to user's complete utterance and update conversation context."""
         process_start = time.time()
@@ -239,7 +213,6 @@ class MedicalMultimodalAgent(MultimodalAgent):
         # Detect language + extract relevant query
         self.current_language = self.detect_language(msg)
         transcript_metrics["language"] = self.current_language
-        relevant_query = msg  # Use complete utterance as query
         
         logger.info(f"Processing transcript for RAG: {json.dumps(msg, ensure_ascii=False)} in {self.current_language}")
         log_with_separator(root_logger, "COMPLETE USER SPEECH", 
@@ -247,7 +220,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
         
         # Perform RAG search
         result = await self.med_fnc_ctx.search_medical_info(
-            query=relevant_query, 
+            query=msg, 
             language=self.current_language
         )
         transcript_metrics["rag_time"] = time.time() - process_start
@@ -289,11 +262,10 @@ class MedicalMultimodalAgent(MultimodalAgent):
 async def entrypoint(ctx: JobContext):
     """Main entry point for the medical assistant."""
     
-    start_time = time.time()
     # Initialize connection
+    start_time = time.time()
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     await ctx.wait_for_participant()
-    
     connect_time = time.time() - start_time
     log_with_separator(root_logger, "SYSTEM STARTUP", f"Connection established in {connect_time:.4f} seconds")
 
@@ -302,7 +274,6 @@ async def entrypoint(ctx: JobContext):
     model_name = "text-embedding-3-small"
     chunk_size = 1024
     similarity_threshold = 0.75
-
     vectorstore = load_vectorstore(model_name, chunk_size)
     vectorstore_time = time.time() - vectorstore_start
     log_with_separator(root_logger, "SYSTEM STARTUP", f"Vector store loaded in {vectorstore_time:.4f} seconds with similarity threshold {similarity_threshold}")
@@ -313,7 +284,8 @@ async def entrypoint(ctx: JobContext):
         model="gpt-4o-realtime-preview-2024-12-17",
         instructions="""You are a HEALTHCARE ASSISTANT.
         Your ONLY purpose is to provide healthcare and medical information.
-        You can ONLY work (understand, speak, and answer) in Vietnamese or English.
+        You can ONLY work (understand, speak, and answer) in two languages: Vietnamese or English. 
+        Do NOT work on other languages, they are maybe noise from the user that you mistranslate.
         Be CONCISE and SMOOTH in your responses without hesitation, no need to repeat the same thing over and over again.
         
         IMPORTANT RULES:
@@ -326,8 +298,10 @@ async def entrypoint(ctx: JobContext):
         voice="coral",
         temperature=0.6,
         modalities=["audio", "text"],
+        turn_detection=openai.realtime.ServerVadOptions(
+            threshold=0.5, prefix_padding_ms=300, silence_duration_ms=800
+            ),
     )
-    
     model_time = time.time() - model_start
     log_with_separator(root_logger, "SYSTEM STARTUP", f"Voice model initialized in {model_time:.4f} seconds")
     
