@@ -232,8 +232,9 @@ class MedicalMultimodalAgent(MultimodalAgent):
             
             if hasattr(self._model, 'sessions') and self._model.sessions:
                 session = self._model.sessions[0]
+                formatted_result = f"CONTEXT:\n{result}\n\nQUERY: {msg}"
                 session.conversation.item.create(
-                    llm.ChatMessage(role="system", content=result)
+                    llm.ChatMessage(role="system", content=formatted_result)
                 )
                 logger.info("RAG results added to conversation")
             transcript_metrics["rag_content"] = result
