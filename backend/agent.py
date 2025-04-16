@@ -44,7 +44,7 @@ def load_vectorstore(model_name: str, chunk_size: int = 1024):
     backend_dir = Path(__file__).parent.absolute()
     model_base_folder = os.path.join(backend_dir, "faiss", f"{model_name}")
     model_folder = os.path.join(model_base_folder, f"chunk_size_{chunk_size}")
-    
+
     logger.info(f"Loading vectorstore from: {model_folder}")
     embeddings = OpenAIEmbeddings(model=model_name)
     result = FAISS.load_local(model_folder, embeddings, allow_dangerous_deserialization=True)
@@ -66,48 +66,44 @@ class MedicalFunctionContext(llm.FunctionContext):
         query: Annotated[str, llm.TypeInfo(description="Medical query to search within the documents")],
         language: Annotated[str, llm.TypeInfo(description="Language of the query (en or vi)")] = "vi",
         k: Annotated[int, llm.TypeInfo(description="Number of relevant documents to retrieve")] = 3,
-        similarity_threshold: Annotated[float, llm.TypeInfo(description="Minimum similarity score to consider a document relevant")] = 0.75,
+        score_threshold: Annotated[float, llm.TypeInfo(description="Minimum relevance score (0-1, higher is better) to consider a document relevant")] = 0.4,
     ) -> str:
-        """RAG search for medical information, with a similarity threshold."""
-        
+        """RAG search for medical information, filtering by relevance score."""
+
         metrics = {
             "query": query,
             "language": language,
             "k": k,
-            "similarity_threshold": similarity_threshold,
+            "score_threshold": score_threshold,
             "timestamp": time.time(),
         }
         total_start_time = time.time()
-        
-        # Log the query
         log_with_separator(root_logger, "USER QUERY", f"Query: {query}\nLanguage: {language}")
-        
+
         # Get relevant documents - measure retrieval time
-        logger.info(f"Searching medical info for: '{query}' with k={k} and similarity threshold={similarity_threshold}")
+        logger.info(f"Searching medical info for: '{query}' with k={k} and relevance score threshold={score_threshold}")
         retrieval_start = time.time()
-        docs_with_scores = self.vectorstore.similarity_search_with_score(query, k=k)
+        filtered_docs = self.vectorstore.similarity_search_with_relevance_scores(
+            query, k=k, score_threshold=score_threshold
+        )
         retrieval_time = time.time() - retrieval_start
         metrics["retrieval_time"] = retrieval_time
-        
-        # Filter by similarity threshold
-        filtered_docs = [(doc, score) for doc, score in docs_with_scores if score >= similarity_threshold]
-        metrics["total_docs"] = len(docs_with_scores)
         metrics["filtered_docs"] = len(filtered_docs)
         if not filtered_docs:
-            metrics["error"] = "No documents above similarity threshold"
+            metrics["error"] = "No documents found meeting the relevance score threshold"
             metrics["total_time"] = time.time() - total_start_time
-            log_with_separator(root_logger, "RAG RESULTS", f"No documents found above threshold {similarity_threshold} for query: '{query}'")
+            log_with_separator(root_logger, "RAG RESULTS", f"No documents found meeting relevance threshold {score_threshold} for query: '{query}'")
             logger.info(f"No documents above threshold for query: '{query}'. Model will answer normally.")
-            return ""  
-        
+            return ""
+
         # Format results for user
         metrics["doc_count"] = len(filtered_docs)
         doc_sources = [getattr(doc, 'metadata', {}).get('source', 'Unknown source') for doc, _ in filtered_docs]
         metrics["doc_sources"] = doc_sources
-        metrics["similarity_scores"] = [float(score) for _, score in filtered_docs]
+        metrics["relevance_scores"] = [float(score) for _, score in filtered_docs]
         
         # Log found documents
-        doc_info = [f"Document {i+1}: {source}, similarity: {float(filtered_docs[i][1]):.4f}" 
+        doc_info = [f"Document {i+1}: {source}, relevance score: {float(filtered_docs[i][1]):.4f}" 
                    for i, source in enumerate(doc_sources)]
         doc_info_str = "\n".join(doc_info)
         log_with_separator(root_logger, "DOCUMENTS FOUND", f"Count: {len(filtered_docs)}\n{doc_info_str}")
@@ -217,7 +213,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
         logger.info(f"Processing transcript for RAG: {json.dumps(msg, ensure_ascii=False)} in {self.current_language}")
         log_with_separator(root_logger, "COMPLETE USER SPEECH", 
                           f"Query: {msg}\nDetected Language: {self.current_language}")
-        
+    
         # Perform RAG search
         result = await self.med_fnc_ctx.search_medical_info(
             query=msg, 
@@ -274,10 +270,9 @@ async def entrypoint(ctx: JobContext):
     vectorstore_start = time.time()
     model_name = "text-embedding-3-small"
     chunk_size = 1024
-    similarity_threshold = 0.75
     vectorstore = load_vectorstore(model_name, chunk_size)
     vectorstore_time = time.time() - vectorstore_start
-    log_with_separator(root_logger, "SYSTEM STARTUP", f"Vector store loaded in {vectorstore_time:.4f} seconds with similarity threshold {similarity_threshold}")
+    log_with_separator(root_logger, "SYSTEM STARTUP", f"Vector store loaded in {vectorstore_time:.4f} seconds")
     
     # Initialize voice model
     model_start = time.time()
@@ -291,16 +286,16 @@ async def entrypoint(ctx: JobContext):
         
         IMPORTANT RULES:
         1. ONLY answer healthcare/medical questions. For ANY other topics, politely refuse and remind the user
-           that you are a dedicated healthcare assistant.
+           that you are a dedicated healthcare assistant, EVEN they ask about your health or other conditions.
         2. If the user speaks in Vietnamese, respond ONLY in Vietnamese.
         3. If the user speaks in English, respond ONLY in English.
-        4. Be clear, accessible, and concise in your explanations.        
+        4. Be clear, accessible, and concise in your explanations.
         """,
         voice="coral",
         temperature=0.6,
         modalities=["audio", "text"],
         turn_detection=openai.realtime.ServerVadOptions(
-            threshold=0.5, prefix_padding_ms=300, silence_duration_ms=800
+            threshold=0.5, prefix_padding_ms=200, silence_duration_ms=1000
             ),
     )
     model_time = time.time() - model_start
