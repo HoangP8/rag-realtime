@@ -21,13 +21,15 @@ logger = logging.getLogger("voice-agent")
 logger.setLevel(logging.INFO)
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.DEBUG)
-log_file_path = Path(__file__).parent / "medical_assistant.log"
+log_dir = Path(__file__).parent / "logs"
+log_dir.mkdir(parents=True, exist_ok=True) 
+log_file_path = log_dir / "medical_assistant.log"
 file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 root_logger.addHandler(file_handler)
 
 def log_with_separator(logger, type_label, content, separator_length=80):
-    """Log with separator"""
+    """Logging function."""
     separator = "=" * separator_length
     logger.info(f"{separator}")
     logger.info(f"{type_label}")
@@ -38,7 +40,7 @@ def log_with_separator(logger, type_label, content, separator_length=80):
     logger.info(f"{separator}")
 
 def load_vectorstore(model_name: str, chunk_size: int = 1024):
-    """Load FAISS vector store from disk with specified model and chunk size."""
+    """Load FAISS vector store from disk with embedding model and chunk size."""
     
     start_time = time.time()
     backend_dir = Path(__file__).parent.absolute()
@@ -66,7 +68,7 @@ class MedicalFunctionContext(llm.FunctionContext):
         query: Annotated[str, llm.TypeInfo(description="Medical query to search within the documents")],
         language: Annotated[str, llm.TypeInfo(description="Language of the query (en or vi)")] = "vi",
         k: Annotated[int, llm.TypeInfo(description="Number of relevant documents to retrieve")] = 3,
-        score_threshold: Annotated[float, llm.TypeInfo(description="Minimum relevance score (0-1, higher is better) to consider a document relevant")] = 0.4,
+        score_threshold: Annotated[float, llm.TypeInfo(description="Minimum relevance score (0-1, higher is better) to consider a document relevant")] = 0.35,
     ) -> str:
         """RAG search for medical information, filtering by relevance score."""
 
@@ -309,6 +311,13 @@ async def entrypoint(ctx: JobContext):
     assistant_time = time.time() - assistant_start
     log_with_separator(root_logger, "SYSTEM STARTUP", f"Assistant started in {assistant_time:.4f} seconds")
     
+    # Warm-up RAG system with dummy query (important to reduce latency at first query)
+    warmup_start = time.time()
+    log_with_separator(root_logger, "SYSTEM WARMUP", "Starting RAG warm-up...")
+    await assistant.med_fnc_ctx.search_medical_info(query="How are you today?", language="en", k=3, score_threshold=0.35)
+    warmup_time = time.time() - warmup_start
+    log_with_separator(root_logger, "SYSTEM WARMUP", f"RAG warm-up completed in {warmup_time:.4f} seconds.")
+    
     # Initial system message
     session = model.sessions[0]
     session.conversation.item.create(
@@ -325,7 +334,6 @@ async def entrypoint(ctx: JobContext):
     )
     session.response.create()
     logger.info("Assistant initialized and ready")
-
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
