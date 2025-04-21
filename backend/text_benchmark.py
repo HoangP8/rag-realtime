@@ -13,7 +13,7 @@ from datasets import load_dataset, Dataset
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
 from ragas import evaluate
-from ragas.metrics import AnswerRelevancy, AnswerCorrectness, AnswerSimilarity, ContextRecall, ContextPrecision, Faithfulness
+from ragas.metrics import AnswerRelevancy, AnswerCorrectness, ContextRecall, ContextPrecision, Faithfulness
 
 # Basic setup
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
@@ -23,24 +23,8 @@ logs_dir = Path(__file__).parent / "logs"
 logs_dir.mkdir(exist_ok=True)
 metrics_logger = logging.getLogger("metrics")
 metrics_logger.setLevel(logging.INFO)
-metrics_handler = logging.FileHandler(logs_dir / "text_metrics.log")
-metrics_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
-metrics_logger.addHandler(metrics_handler)
 qa_logger = logging.getLogger("qa_logs")
 qa_logger.setLevel(logging.INFO)
-qa_handler = logging.FileHandler(logs_dir / "text_qa_results.log")
-qa_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
-qa_logger.addHandler(qa_handler)
-
-# Configuration
-default_model_name = "text-embedding-3-small"
-default_chunk_size = 1024
-default_split_ratio = 0.8
-default_generator_model = "gpt-4o"
-default_k = 3
-default_score_threshold = 0.35
-default_max_test_samples = 100 # set to None to run all
-random.seed(0)
 
 template_prompt = """
 You are a HEALTHCARE ASSISTANT.
@@ -56,14 +40,22 @@ that you are a dedicated healthcare assistant, EVEN they ask about your health o
 """
 
 def load_dataset_split(split_ratio: float, max_samples: int | None = None, is_train: bool = False) -> Dataset:
-    """Dataset loading function"""
+    """Split max_samples from the dataset, split by train/test"""
     dataset = load_dataset("urnus11/Vietnamese-Healthcare")["medical_qa"]
     
-    if max_samples and max_samples < len(dataset):
-        dataset = dataset.select(range(min(max_samples, len(dataset))))
+    # Split the dataset 
+    total_rows = len(dataset)
+    train_size = int(total_rows * split_ratio)
+    if is_train:
+        split_dataset = dataset.select(range(train_size))
+    else:
+        split_dataset = dataset.select(range(train_size, total_rows))
     
-    splits = dataset.train_test_split(train_size=split_ratio, seed=0)
-    return splits["train"] if is_train else splits["test"]
+    # Randomly sample max_samples
+    if max_samples and max_samples < len(split_dataset):
+        indices = random.sample(range(len(split_dataset)), min(max_samples, len(split_dataset)))
+        return split_dataset.select(indices)
+    return split_dataset
 
 
 def load_vectorstore(model_name: str, chunk_size: int):
@@ -83,12 +75,16 @@ def load_vectorstore(model_name: str, chunk_size: int):
 
 async def generate_answers(dataset: Dataset, vectorstore: FAISS = None, llm: ChatOpenAI = None, 
                            k: int = 3, score_threshold: float = 0.35, use_rag: bool = True):
-    """Unified answer generation function for both RAG and non-RAG approaches"""
-    results = []
+    """
+    Answer generation function for both RAG and non-RAG approaches
+    Return:
+    - Dataset with with keys: 'question', 'answer', 'contexts', 'ground_truth'
+    """
     
+    results = []
     async def process_item(item):
-        question = item['question']
-        ground_truth = item['ground_truth']
+        question = item['title']
+        ground_truth = item['content']
         
         # Only retrieve contexts if using RAG
         contexts = []
@@ -133,7 +129,7 @@ async def generate_answers(dataset: Dataset, vectorstore: FAISS = None, llm: Cha
     return Dataset.from_list(results)
 
 
-async def evaluate_dataset(dataset: Dataset, llm: ChatOpenAI, embeddings: OpenAIEmbeddings, dataset_name: str):
+async def evaluate_dataset(dataset: Dataset, dataset_name: str):
     """Evaluate a dataset with RAGAS metrics."""
     logger.info(f"Starting RAGAS evaluation for {dataset_name}...")
     evaluation_start_time = time.time()
@@ -144,17 +140,11 @@ async def evaluate_dataset(dataset: Dataset, llm: ChatOpenAI, embeddings: OpenAI
         AnswerRelevancy(),     # How relevant is the answer to the question? (Uses LLM)
         ContextPrecision(),    # Signal-to-noise ratio of retrieved context. (Uses LLM)
         ContextRecall(),       # How much of the ground truth is covered by the context?
-        AnswerSimilarity(),    # Semantic similarity between answer and ground truth.
         AnswerCorrectness(),   # Factual correctness compared to ground truth. (Uses LLM)
     ]
     
-    result = evaluate(
-        dataset,
-        metrics=metrics,
-        llm=llm, 
-        embeddings=embeddings
-    )
-    
+    # Run evaluation
+    result = evaluate(dataset=dataset, metrics=metrics)
     evaluation_time = time.time() - evaluation_start_time
     logger.info(f"RAGAS evaluation for {dataset_name} completed in {evaluation_time:.2f} seconds.")
     return result
@@ -163,12 +153,25 @@ async def evaluate_dataset(dataset: Dataset, llm: ChatOpenAI, embeddings: OpenAI
 async def run_benchmark(args):
     """Main benchmarking function."""
     start_run_time = time.time()
-    
-    # Log hyperparameters
-    metrics_logger.info(f"BENCHMARK RUN - Parameters: model={args.model}, chunk_size={args.chunk_size}, "
-                       f"split_ratio={args.split_ratio}, generator_model={args.generator_model}, "
-                       f"k={args.k}, score_threshold={args.score_threshold}, max_samples={args.max_samples}")
 
+    logs_dir = Path(__file__).parent / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    model_dir = logs_dir / f"chunk_size_{args.chunk_size}_{args.model}"
+    model_dir.mkdir(exist_ok=True)
+
+    # Configure logger handler
+    metrics_handler = logging.FileHandler(model_dir / "text_metrics.log")
+    metrics_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    metrics_logger.addHandler(metrics_handler)
+
+    qa_handler = logging.FileHandler(model_dir / "text_qa_results.log")
+    qa_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    qa_logger.addHandler(qa_handler)
+
+    metrics_logger.info(f"BENCHMARK RUN - Parameters: model={args.model}, chunk_size={args.chunk_size}, "
+                       f"split_ratio={args.split_ratio}, llm={args.llm}, "
+                       f"k={args.k}, score_threshold={args.score_threshold}, max_samples={args.max_samples}")
+    
     # Load Train (ID) and Test (OOD) Data
     train_dataset = load_dataset_split(args.split_ratio, max_samples=args.max_samples, is_train=True)
     test_dataset = load_dataset_split(args.split_ratio, max_samples=args.max_samples, is_train=False)
@@ -177,7 +180,7 @@ async def run_benchmark(args):
     vectorstore, embeddings = load_vectorstore(args.model, args.chunk_size)
 
     # Initialize LLM and Embeddings
-    llm = ChatOpenAI(model=args.generator_model, temperature=0.7) 
+    llm = ChatOpenAI(model=args.llm, temperature=0.7) 
 
     # Generate Baseline Answers (without RAG)
     train_baseline_dataset = await generate_answers(
@@ -185,7 +188,6 @@ async def run_benchmark(args):
         llm=llm, 
         use_rag=False,
     )
-    
     test_baseline_dataset = await generate_answers(
         dataset=test_dataset, 
         llm=llm, 
@@ -201,7 +203,6 @@ async def run_benchmark(args):
         score_threshold=args.score_threshold, 
         use_rag=True,
     )
-    
     test_rag_dataset = await generate_answers(
         dataset=test_dataset, 
         llm=llm, 
@@ -215,64 +216,68 @@ async def run_benchmark(args):
     
     # Evaluate baseline (no RAG)
     results["train_baseline"] = await evaluate_dataset(
-        train_baseline_dataset, llm, embeddings, "Train Baseline (No RAG)"
+        train_baseline_dataset, "Train Baseline (No RAG)"
     )
     results["test_baseline"] = await evaluate_dataset(
-        test_baseline_dataset, llm, embeddings, "Test Baseline (No RAG)"
+        test_baseline_dataset, "Test Baseline (No RAG)"
     )
     
     # Evaluate with RAG
     results["train_rag"] = await evaluate_dataset(
-        train_rag_dataset, llm, embeddings, "Train RAG"
+        train_rag_dataset, "Train RAG"
     )
     results["test_rag"] = await evaluate_dataset(
-        test_rag_dataset, llm, embeddings, "Test RAG"
+        test_rag_dataset, "Test RAG"
     )
 
-    # Display and Log Results
-    print("\n--- RAGAS Evaluation Results ---")
+    # Log Results and save to CSV files
     for name, result in results.items():
-        print(f"\n{name.upper()} RESULTS:")
-        print(result)
-        metrics_logger.info(f"RESULTS - {name}: {result.to_dict()}")
-    print("---------------------------------")
-
-    # Save results to CSV files
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    for name, result in results.items():
-        results_df = result.to_pandas()
-        output_filename = f"benchmark_{name}_{args.generator_model}_{args.model}_cs{args.chunk_size}_k{args.k}_t{args.score_threshold}_{timestamp}.csv"
-        output_path = Path(__file__).parent / output_filename
-        results_df.to_csv(output_path, index=False)
-        logger.info(f"{name.capitalize()} results saved to: {output_path}")
-        metrics_logger.info(f"CSV SAVED - {name}: {output_path}")
-
-    # Create a summary comparison table
+        metrics_logger.info(f"RESULTS - {name}: {result}")
+    logs_dir = Path(__file__).parent / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    model_dir = logs_dir / f"chunk_size_{args.chunk_size}_{args.model}"
+    model_dir.mkdir(exist_ok=True)
     summary_data = {}
+    
     for name, result in results.items():
-        result_dict = result.to_dict()
-        for metric, value in result_dict.items():
-            summary_data.setdefault(metric, {})[name] = value
+        numeric_df = result.to_pandas().select_dtypes(include=['number'])
+        result_dict_row = numeric_df.iloc[0].to_dict()
+        for metric, score in result_dict_row.items():
+            summary_data.setdefault(metric, {})[name] = score
     summary_df = pd.DataFrame(summary_data)
-    summary_path = Path(__file__).parent / f"benchmark_summary_{timestamp}.csv"
-    summary_df.to_csv(summary_path)
+    summary_path = model_dir / "summary.csv"
+    summary_df.to_csv(summary_path) 
     logger.info(f"Summary comparison saved to: {summary_path}")
     metrics_logger.info(f"SUMMARY SAVED: {summary_path}")
+
     total_run_time = time.time() - start_run_time
     logger.info(f"Benchmarking finished in {total_run_time:.2f} seconds.")
     metrics_logger.info(f"BENCHMARK COMPLETED - Total runtime: {total_run_time:.2f} seconds")
+    metrics_logger.removeHandler(metrics_handler)
+    qa_logger.removeHandler(qa_handler)
+
 
 if __name__ == "__main__":
+    # Configuration
+    default_embedding_model = "text-embedding-3-small"
+    default_chunk_size = 1024
+    default_split_ratio = 0.8
+    default_llm = "gpt-4o"
+    default_k = 3
+    default_score_threshold = 0.35
+    default_max_test_samples = 100
+    random.seed(0)
+    
+    # Argument parsing
     parser = argparse.ArgumentParser(description="Benchmark RAG system using RAGAS")
-
-    parser.add_argument("--model", type=str, default=default_model_name,
+    parser.add_argument("--model", type=str, default=default_embedding_model,
                         choices=["text-embedding-ada-002", "text-embedding-3-small", "text-embedding-3-large"],
                         help="Embedding model used for vector store.")
     parser.add_argument("--chunk_size", type=int, default=default_chunk_size,
                         help="Chunk size used for vector store.")
     parser.add_argument("--split_ratio", type=float, default=default_split_ratio,
                         help="Train/test split ratio used when creating the vector store (to load the correct test set).")
-    parser.add_argument("--generator_model", type=str, default=default_generator_model,
+    parser.add_argument("--llm", type=str, default=default_llm,
                         help="OpenAI model used to generate answers (e.g., gpt-4o, gpt-3.5-turbo).")
     parser.add_argument("--k", type=int, default=default_k,
                         help="Number of documents to retrieve.")
@@ -283,5 +288,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Run the benchmark asynchronously
+    # Run the benchmark
     asyncio.run(run_benchmark(args))
