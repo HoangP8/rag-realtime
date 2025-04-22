@@ -5,8 +5,10 @@ import logging
 from typing import Dict, List, Optional, Any
 from uuid import UUID
 
+import httpx
 from supabase import Client
 
+from app.core.config import settings
 from app.schemas.conversations import (
     ConversationCreate,
     ConversationResponse,
@@ -19,82 +21,134 @@ from app.services.llm import LLMService
 
 class ConversationService:
     """Service for conversation operations"""
-    
+
     def __init__(self, supabase: Client, llm_service: LLMService):
         """Initialize with Supabase client and LLM service"""
         self.supabase = supabase
         self.llm_service = llm_service
         self.logger = logging.getLogger(__name__)
-    
+
+        # Conversation service URL
+        self.conversation_service_url = settings.CONVERSATION_SERVICE_URL
+        if not self.conversation_service_url:
+            self.conversation_service_url = "http://localhost:8002"
+
     async def get_user_conversations(self, user_id: UUID) -> List[ConversationResponse]:
         """Get all conversations for a user"""
         try:
-            # Query conversations table
-            response = self.supabase.table("conversations") \
-                .select("*") \
-                .eq("user_id", str(user_id)) \
-                .order("updated_at", desc=True) \
-                .execute()
-            
-            # Convert to response models
-            conversations = []
-            for item in response.data:
-                conversations.append(ConversationResponse(**item))
-            
-            return conversations
-        
+            # Set authorization header with user ID
+            headers = {"Authorization": f"Bearer {str(user_id)}"}
+
+            # Call conversation service API
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.conversation_service_url}/api/v1/conversations",
+                    headers=headers
+                )
+
+                # Check response
+                if response.status_code != 200:
+                    self.logger.error(f"Error getting user conversations: {response.text}")
+                    raise Exception(f"Conversation service returned error: {response.text}")
+
+                # Parse response
+                conversations_data = response.json()
+
+                # Convert to ConversationResponse objects
+                conversations = []
+                for item in conversations_data:
+                    conversation = ConversationResponse(
+                        id=UUID(item["id"]),
+                        user_id=UUID(item["user_id"]),
+                        title=item["title"],
+                        created_at=item["created_at"],
+                        updated_at=item["updated_at"],
+                        metadata=item["metadata"] or {}
+                    )
+                    conversations.append(conversation)
+
+                return conversations
+
         except Exception as e:
             self.logger.error(f"Error getting user conversations: {str(e)}")
             raise
-    
+
     async def create_conversation(self, user_id: UUID, data: ConversationCreate) -> ConversationResponse:
         """Create a new conversation"""
         try:
-            # Prepare conversation data
-            conversation_data = {
-                "user_id": str(user_id),
+            # Set authorization header with user ID
+            headers = {"Authorization": f"Bearer {str(user_id)}"}
+
+            # Prepare request data
+            request_data = {
                 "title": data.title or "New Conversation",
                 "metadata": data.metadata or {},
                 "tags": data.tags or [],
                 "is_archived": False
             }
-            
-            # Insert into conversations table
-            response = self.supabase.table("conversations") \
-                .insert(conversation_data) \
-                .execute()
-            
-            # Return created conversation
-            return ConversationResponse(**response.data[0])
-        
+
+            # Call conversation service API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.conversation_service_url}/api/v1/conversations",
+                    json=request_data,
+                    headers=headers
+                )
+
+                # Check response
+                if response.status_code != 200 and response.status_code != 201:
+                    self.logger.error(f"Error creating conversation: {response.text}")
+                    raise Exception(f"Conversation service returned error: {response.text}")
+
+                # Parse response
+                created = response.json()
+
+                # Return created conversation
+                return ConversationResponse(**created)
+
         except Exception as e:
             self.logger.error(f"Error creating conversation: {str(e)}")
             raise
-    
+
     async def get_conversation(self, user_id: UUID, conversation_id: UUID) -> Optional[ConversationResponse]:
         """Get a specific conversation"""
         try:
-            # Query conversations table
-            response = self.supabase.table("conversations") \
-                .select("*") \
-                .eq("id", str(conversation_id)) \
-                .eq("user_id", str(user_id)) \
-                .execute()
-            
-            # Return conversation if found
-            if response.data:
-                return ConversationResponse(**response.data[0])
-            return None
-        
+            # Set authorization header with user ID
+            headers = {"Authorization": f"Bearer {str(user_id)}"}
+
+            # Call conversation service API
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.conversation_service_url}/api/v1/conversations/{conversation_id}",
+                    headers=headers
+                )
+
+                # Check response
+                if response.status_code == 404:
+                    return None
+
+                if response.status_code != 200:
+                    self.logger.error(f"Error getting conversation: {response.text}")
+                    raise Exception(f"Conversation service returned error: {response.text}")
+
+                # Parse response
+                conversation_data = response.json()
+
+                # Return conversation
+                return ConversationResponse(**conversation_data)
+
         except Exception as e:
             self.logger.error(f"Error getting conversation: {str(e)}")
             raise
-    
+
     async def update_conversation(
         self, user_id: UUID, conversation_id: UUID, data: ConversationUpdate
     ) -> Optional[ConversationResponse]:
         """Update a conversation"""
         try:
+            # Set authorization header with user ID
+            headers = {"Authorization": f"Bearer {str(user_id)}"}
+
             # Prepare update data
             update_data = {}
             if data.title is not None:
@@ -105,117 +159,138 @@ class ConversationService:
                 update_data["tags"] = data.tags
             if data.is_archived is not None:
                 update_data["is_archived"] = data.is_archived
-            
-            # Update conversation
-            response = self.supabase.table("conversations") \
-                .update(update_data) \
-                .eq("id", str(conversation_id)) \
-                .eq("user_id", str(user_id)) \
-                .execute()
-            
-            # Return updated conversation if found
-            if response.data:
-                return ConversationResponse(**response.data[0])
-            return None
-        
+
+            # Call conversation service API
+            async with httpx.AsyncClient() as client:
+                response = await client.patch(
+                    f"{self.conversation_service_url}/api/v1/conversations/{conversation_id}",
+                    json=update_data,
+                    headers=headers
+                )
+
+                # Check response
+                if response.status_code == 404:
+                    return None
+
+                if response.status_code != 200:
+                    self.logger.error(f"Error updating conversation: {response.text}")
+                    raise Exception(f"Conversation service returned error: {response.text}")
+
+                # Parse response
+                conversation_data = response.json()
+
+                # Return updated conversation
+                return ConversationResponse(**conversation_data)
+
         except Exception as e:
             self.logger.error(f"Error updating conversation: {str(e)}")
             raise
-    
+
     async def delete_conversation(self, user_id: UUID, conversation_id: UUID) -> bool:
         """Delete a conversation"""
         try:
-            # Delete conversation
-            response = self.supabase.table("conversations") \
-                .delete() \
-                .eq("id", str(conversation_id)) \
-                .eq("user_id", str(user_id)) \
-                .execute()
-            
-            # Return success status
-            return len(response.data) > 0
-        
+            # Set authorization header with user ID
+            headers = {"Authorization": f"Bearer {str(user_id)}"}
+
+            # Call conversation service API
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{self.conversation_service_url}/api/v1/conversations/{conversation_id}",
+                    headers=headers
+                )
+
+                # Check response
+                if response.status_code == 404:
+                    return False
+
+                if response.status_code != 200 and response.status_code != 204:
+                    self.logger.error(f"Error deleting conversation: {response.text}")
+                    raise Exception(f"Conversation service returned error: {response.text}")
+
+                return True
+
         except Exception as e:
             self.logger.error(f"Error deleting conversation: {str(e)}")
             raise
-    
+
     async def get_conversation_messages(self, user_id: UUID, conversation_id: UUID) -> List[MessageResponse]:
         """Get all messages for a conversation"""
         try:
-            # First verify the conversation belongs to the user
-            conversation = await self.get_conversation(user_id, conversation_id)
-            if not conversation:
-                return []
-            
-            # Query messages table
-            response = self.supabase.table("messages") \
-                .select("*") \
-                .eq("conversation_id", str(conversation_id)) \
-                .order("created_at") \
-                .execute()
-            
-            # Convert to response models
-            messages = []
-            for item in response.data:
-                messages.append(MessageResponse(**item))
-            
-            return messages
-        
+            # Set authorization header with user ID
+            headers = {"Authorization": f"Bearer {str(user_id)}"}
+
+            # Call conversation service API
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.conversation_service_url}/api/v1/conversations/{conversation_id}/messages",
+                    headers=headers
+                )
+
+                # Check response
+                if response.status_code == 404:
+                    return []
+
+                if response.status_code != 200:
+                    self.logger.error(f"Error getting conversation messages: {response.text}")
+                    raise Exception(f"Conversation service returned error: {response.text}")
+
+                # Parse response
+                messages_data = response.json()
+
+                # Convert to MessageResponse objects
+                messages = []
+                for item in messages_data:
+                    messages.append(MessageResponse(**item))
+
+                return messages
+
         except Exception as e:
             self.logger.error(f"Error getting conversation messages: {str(e)}")
             raise
-    
+
     async def create_message(
         self, user_id: UUID, conversation_id: UUID, data: MessageCreate
     ) -> MessageResponse:
         """Create a new message in a conversation"""
         try:
-            # First verify the conversation belongs to the user
-            conversation = await self.get_conversation(user_id, conversation_id)
-            if not conversation:
-                raise ValueError("Conversation not found")
-            
+            # Set authorization header with user ID
+            headers = {"Authorization": f"Bearer {str(user_id)}"}
+
             # Prepare message data
             message_data = {
-                "conversation_id": str(conversation_id),
                 "role": data.role,
                 "content": data.content,
                 "message_type": data.message_type,
                 "voice_url": data.voice_url,
                 "metadata": data.metadata or {}
             }
-            
-            # Insert user message
-            response = self.supabase.table("messages") \
-                .insert(message_data) \
-                .execute()
-            
-            user_message = MessageResponse(**response.data[0])
-            
-            # If this is a user message, generate AI response
-            if data.role == "user":
-                # Get conversation history
-                messages = await self.get_conversation_messages(user_id, conversation_id)
-                
-                # Generate AI response
-                ai_response = await self.llm_service.generate_response(messages, data.content)
-                
-                # Save AI response
-                ai_message_data = {
-                    "conversation_id": str(conversation_id),
-                    "role": "assistant",
-                    "content": ai_response,
-                    "message_type": "text",
-                    "metadata": {}
-                }
-                
-                ai_response = self.supabase.table("messages") \
-                    .insert(ai_message_data) \
-                    .execute()
-            
+
+            # Call conversation service API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.conversation_service_url}/api/v1/conversations/{conversation_id}/messages",
+                    json=message_data,
+                    headers=headers
+                )
+
+                # Check response
+                if response.status_code == 404:
+                    raise ValueError("Conversation not found")
+
+                if response.status_code != 200 and response.status_code != 201:
+                    self.logger.error(f"Error creating message: {response.text}")
+                    raise Exception(f"Conversation service returned error: {response.text}")
+
+                # Parse response
+                message_data = response.json()
+
+                # Return created message
+                user_message = MessageResponse(**message_data)
+
+            # The conversation service will handle generating AI responses
             # Return the user message
             return user_message
-        
+
         except Exception as e:
             self.logger.error(f"Error creating message: {str(e)}")
             raise
