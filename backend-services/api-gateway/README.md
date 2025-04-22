@@ -8,7 +8,6 @@ This is the API Gateway service for the Medical Chatbot application. It provides
 - Conversation management (via Conversation Service)
 - Voice session management (via Voice Service)
 - User profile management (via Auth Service)
-- Integration with LLM Service for AI capabilities
 - Integration with Voice Service for real-time voice communication using OpenAI Realtime API
 
 ## Getting Started
@@ -21,7 +20,6 @@ This is the API Gateway service for the Medical Chatbot application. It provides
   - Auth Service (default: port 8001)
   - Conversation Service (default: port 8002)
   - Voice Service (default: port 8003)
-  - LLM Service (default: port 8004)
 
 ### Installation
 
@@ -53,14 +51,13 @@ Create a `.env` file in the root directory with the following variables:
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# OpenAI API key (for fallback if LLM service is down)
+# OpenAI API key (used by conversation service)
 OPENAI_API_KEY=your_openai_api_key
 
 # Microservices URLs (example values - adjust as needed)
 AUTH_SERVICE_URL=http://localhost:8001  # Example - Auth service address
 CONVERSATION_SERVICE_URL=http://localhost:8002  # Example - Conversation service address
 VOICE_SERVICE_URL=http://localhost:8003  # Example - Voice service address
-LLM_SERVICE_URL=http://localhost:8004  # Example - LLM service address
 
 # RabbitMQ configuration (if needed)
 # RABBITMQ_HOST=localhost  # Example - RabbitMQ host

@@ -16,16 +16,14 @@ from app.schemas.conversations import (
     MessageCreate,
     MessageResponse
 )
-from app.services.llm import LLMService
 
 
 class ConversationService:
     """Service for conversation operations"""
 
-    def __init__(self, supabase: Client, llm_service: LLMService):
-        """Initialize with Supabase client and LLM service"""
+    def __init__(self, supabase: Client):
+        """Initialize with Supabase client"""
         self.supabase = supabase
-        self.llm_service = llm_service
         self.logger = logging.getLogger(__name__)
 
         # Conversation service URL

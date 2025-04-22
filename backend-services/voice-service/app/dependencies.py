@@ -9,8 +9,6 @@ from fastapi import Depends, Header, HTTPException, status
 from supabase import create_client, Client
 
 from app.config import settings
-# Removed VoiceService import
-from app.services.llm import LLMService
 from app.messaging.rabbitmq import RabbitMQService
 from app.realtime.session_manager import SessionManager
 
@@ -28,11 +26,6 @@ def get_supabase_client() -> Client:
         raise ValueError("Supabase URL and key must be provided")
 
     return create_client(url, key)
-
-
-def get_llm_service() -> LLMService:
-    """Get LLM service"""
-    return LLMService()
 
 
 # RabbitMQ service singleton

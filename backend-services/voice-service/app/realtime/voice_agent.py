@@ -18,7 +18,6 @@ from openai import OpenAI
 
 from app.config import settings
 from app.models import VoiceSessionConfig
-from app.services.llm import LLMService
 from app.livekit.connection import LiveKitConnection
 
 
@@ -84,7 +83,6 @@ class VoiceAgent:
         self.metadata = metadata or {}
 
         self.livekit_connection = LiveKitConnection()
-        self.llm_service = LLMService()
         self.logger = logging.getLogger(__name__)
 
         self.room = rtc.Room()
@@ -276,6 +274,16 @@ class VoiceAgent:
         # Handle response completion
         @session.on("response_done")
         def on_response_done(response: lk_openai.realtime.RealtimeResponse):
+            # If response is successful and we have a conversation_id, store the response
+            if response.status == "complete" and self.conversation_id:
+                # Get the response text
+                response_text = response.text
+                if response_text:
+                    # Store the response in the conversation database
+                    asyncio.create_task(self.store_transcription(response_text, "assistant"))
+                return
+
+            # Handle error cases
             message = None
             if response.status == "incomplete":
                 if response.status_details and response.status_details['reason']:
@@ -394,6 +402,11 @@ class VoiceAgent:
 
             # Broadcast transcription to WebSockets
             if hasattr(event, 'text') and event.text:
+                # Store transcription in conversation database if conversation_id is provided
+                if self.conversation_id:
+                    asyncio.create_task(self.store_transcription(event.text, "user"))
+
+                # Broadcast to WebSockets
                 asyncio.create_task(self.broadcast_message({
                     "type": "transcription",
                     "text": event.text,
@@ -560,6 +573,10 @@ class VoiceAgent:
             return
 
         try:
+            # Store text message in conversation database if conversation_id is provided
+            if self.conversation_id:
+                await self.store_transcription(text, "user")
+
             # Process text message using OpenAI Realtime API
             # Create a chat message in the conversation
             self.session.conversation.item.create(
@@ -722,3 +739,36 @@ class VoiceAgent:
             "text": text,
             "is_final": is_final
         })
+
+    async def store_transcription(self, text: str, role: str):
+        """
+        Store transcription in conversation database
+
+        Args:
+            text: Transcription text
+            role: Message role (user or assistant)
+        """
+        try:
+            from app.dependencies import get_supabase_client
+
+            # Get Supabase client
+            supabase = get_supabase_client()
+
+            # Prepare message data
+            message_data = {
+                "conversation_id": str(self.conversation_id),
+                "role": role,
+                "content": text,
+                "message_type": "voice",
+                "metadata": {"source": "voice_session", "session_id": self.session_id}
+            }
+
+            # Insert message into database
+            response = supabase.table("messages").insert(message_data).execute()
+
+            self.logger.info(f"Stored transcription in conversation {self.conversation_id}")
+            return response.data[0]
+
+        except Exception as e:
+            self.logger.error(f"Error storing transcription: {str(e)}")
+            # Don't raise the exception to avoid interrupting the conversation flow

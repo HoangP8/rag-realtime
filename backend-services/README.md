@@ -10,7 +10,6 @@ The backend is built using a microservices architecture with the following compo
 2. **Auth Service**: Handles user authentication and authorization
 3. **Conversation Service**: Manages conversations and messages
 4. **Voice Service**: Handles real-time voice communication via LiveKit
-5. **LLM Service**: Integrates with OpenAI for AI responses
 
 ## Technologies
 
@@ -51,7 +50,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    cd ../auth-service && pip install -r requirements.txt
    cd ../conversation-service && pip install -r requirements.txt
    cd ../voice-service && pip install -r requirements.txt
-   cd ../llm-service && pip install -r requirements.txt
    ```
 
 2. Run each service in a separate terminal:
@@ -60,7 +58,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    cd auth-service && uvicorn app.main:app --reload --port 8001
    cd conversation-service && uvicorn app.main:app --reload --port 8002
    cd voice-service && uvicorn app.main:app --reload --port 8003
-   cd llm-service && uvicorn app.main:app --reload --port 8004
    ```
 
 ### Running with Docker
@@ -79,7 +76,6 @@ Once the services are running, you can access the API documentation at:
 - Auth Service: `http://localhost:8001/docs`
 - Conversation Service: `http://localhost:8002/docs`
 - Voice Service: `http://localhost:8003/docs`
-- LLM Service: `http://localhost:8004/docs`
 
 ## Troubleshooting
 

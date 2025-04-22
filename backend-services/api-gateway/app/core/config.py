@@ -34,7 +34,6 @@ class Settings(BaseSettings):
     AUTH_SERVICE_URL: str = os.getenv("AUTH_SERVICE_URL", "http://localhost:8001")
     CONVERSATION_SERVICE_URL: str = os.getenv("CONVERSATION_SERVICE_URL", "http://localhost:8002")
     VOICE_SERVICE_URL: str = os.getenv("VOICE_SERVICE_URL", "http://localhost:8003")
-    LLM_SERVICE_URL: str = os.getenv("LLM_SERVICE_URL", "http://localhost:8004")
 
     @validator("CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:

@@ -12,7 +12,6 @@ from app.services.auth import AuthService
 from app.services.conversations import ConversationService
 from app.services.voice import VoiceService
 from app.services.profile import ProfileService
-from app.services.llm import LLMService
 from app.db.supabase import get_supabase_client
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
@@ -32,26 +31,19 @@ def get_auth_service():
 def get_conversation_service():
     """Get conversation service"""
     supabase = get_supabase()
-    llm_service = get_llm_service()
-    return ConversationService(supabase, llm_service)
+    return ConversationService(supabase)
 
 
 def get_voice_service():
     """Get voice service"""
     supabase = get_supabase()
-    llm_service = get_llm_service()
-    return VoiceService(supabase, llm_service)
+    return VoiceService(supabase)
 
 
 def get_profile_service():
     """Get profile service"""
     supabase = get_supabase()
     return ProfileService(supabase)
-
-
-def get_llm_service():
-    """Get LLM service"""
-    return LLMService()
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> UUID:

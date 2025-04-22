@@ -11,16 +11,14 @@ from supabase import Client
 
 from app.core.config import settings
 from app.schemas.voice import VoiceSessionCreate, VoiceSessionResponse, VoiceSessionConfig
-from app.services.llm import LLMService
 
 
 class VoiceService:
     """Service for voice operations"""
 
-    def __init__(self, supabase: Client, llm_service: LLMService):
-        """Initialize with Supabase client and LLM service"""
+    def __init__(self, supabase: Client):
+        """Initialize with Supabase client"""
         self.supabase = supabase
-        self.llm_service = llm_service
         self.logger = logging.getLogger(__name__)
 
         # Voice service URL
