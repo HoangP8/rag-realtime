@@ -8,8 +8,8 @@ The backend is built using a microservices architecture with the following compo
 
 1. **API Gateway**: Central entry point for all client requests
 2. **Auth Service**: Handles user authentication and authorization
-3. **Conversation Service**: Manages conversations and messages
-4. **Voice Service**: Handles real-time voice communication via LiveKit
+3. **Conversation Service**: Manages conversations, messages, and LLM interactions
+4. **Voice Service**: Handles real-time voice communication via LiveKit and OpenAI Realtime API
 
 ## Technologies
 
@@ -158,7 +158,7 @@ The Auth Service handles user authentication and authorization using Supabase Au
 
 ### Conversation Service
 
-The Conversation Service manages conversations and messages. It provides endpoints for creating, retrieving, updating, and deleting conversations and messages.
+The Conversation Service manages conversations, messages, and LLM interactions. It provides endpoints for creating, retrieving, updating, and deleting conversations and messages. It also handles generating AI responses using the OpenAI API directly.
 
 ### Voice Service
 
@@ -247,6 +247,23 @@ Replace `<token>` with the token obtained from the session creation API and upda
   {"type":"control","action":"stop"}
   ```
 
-### LLM Service
+## Deployment
 
-The LLM Service integrates with OpenAI to generate AI responses. It provides endpoints for generating chat completions, transcribing audio, and converting text to speech.
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+### Quick Deployment to fly.io
+
+```bash
+# Navigate to the backend-services directory
+cd backend-services
+
+# Set up secrets (replace with your actual values)
+flyctl secrets set NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+flyctl secrets set NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+flyctl secrets set OPENAI_API_KEY=your_openai_api_key
+
+# Deploy the application
+flyctl deploy
+```
+
+This will deploy all services to a single fly.io instance for cost efficiency during the trial phase.
