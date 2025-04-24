@@ -25,6 +25,7 @@ The Medical Chatbot API follows RESTful principles and uses JSON for request and
 ## Base URLs
 
 **Development**: `http://localhost:8000`
+
 **Production**: `https://api.medicalchatbot.com` (example - replace with actual production URL)
 
 All API endpoints are prefixed with `/api/v1`.
