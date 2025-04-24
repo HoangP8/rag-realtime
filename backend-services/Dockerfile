@@ -17,7 +17,8 @@ COPY voice-service/requirements.txt /app/voice-service/
 RUN pip install --no-cache-dir -r api-gateway/requirements.txt \
     && pip install --no-cache-dir -r auth-service/requirements.txt \
     && pip install --no-cache-dir -r conversation-service/requirements.txt \
-    && pip install --no-cache-dir -r voice-service/requirements.txt
+    && pip install --no-cache-dir -r voice-service/requirements.txt \
+    && pip install --no-cache-dir pydantic-settings>=2.0.3
 
 # Copy service code
 COPY api-gateway/ /app/api-gateway/

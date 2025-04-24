@@ -10,7 +10,7 @@ from app.livekit.config import LiveKitConfig
 
 
 @lru_cache()
-def get_livekit_client() -> api.RoomServiceClient:
+def get_livekit_client():
     """
     Create and return a LiveKit client
     Uses LRU cache to avoid creating multiple clients
@@ -18,11 +18,11 @@ def get_livekit_client() -> api.RoomServiceClient:
     if not LiveKitConfig.API_KEY or not LiveKitConfig.API_SECRET or not LiveKitConfig.URL:
         raise ValueError("LiveKit API key, secret, and URL must be provided")
     
-    return api.RoomServiceClient(
+    return api.LiveKitAPI(
         LiveKitConfig.URL,
         LiveKitConfig.API_KEY,
         LiveKitConfig.API_SECRET
-    )
+    ).room
 
 
 class LiveKitConnection:

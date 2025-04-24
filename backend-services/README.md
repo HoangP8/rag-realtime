@@ -30,16 +30,41 @@ The backend is built using a microservices architecture with the following compo
 
 ### Environment Setup
 
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` or `.env.local` file in the root directory with the following variables:
+
+> **Note**: You can create a single `.env.local` file in the `backend-services` directory and run the `copy_env.py` script to copy it to all service directories:
+> ```bash
+> cd backend-services
+> python copy_env.py
+> ```
 
 ```
+# Supabase credentials (required)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# OpenAI API key (required)
 OPENAI_API_KEY=your_openai_api_key
+
+# LiveKit settings (for voice service)
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
 LIVEKIT_URL=your_livekit_url
+
+# Deepgram API key (optional, for alternative transcription)
 DEEPGRAM_API_KEY=your_deepgram_api_key
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Service URLs (for local development)
+AUTH_SERVICE_URL=http://localhost:8001
+CONVERSATION_SERVICE_URL=http://localhost:8002
+VOICE_SERVICE_URL=http://localhost:8003
+
+# RabbitMQ configuration (if needed)
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USER=guest
+RABBITMQ_PASSWORD=guest
+RABBITMQ_VHOST=/
 ```
 
 ### Running Locally

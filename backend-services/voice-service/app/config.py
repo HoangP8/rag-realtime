@@ -4,7 +4,8 @@ Configuration settings for the Voice Service
 import os
 from typing import List, Union
 
-from pydantic import AnyHttpUrl, BaseSettings, validator
+from pydantic import AnyHttpUrl, validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -48,7 +49,15 @@ class Settings(BaseSettings):
     class Config:
         """Pydantic config"""
         case_sensitive = True
-        env_file = ".env"
+        env_file = ".env.local"
+        env_file_encoding = 'utf-8'
+        extra = 'ignore'
+
+    class ConfigDict:
+        # For Pydantic v2 compatibility
+        env_file = [".env", ".env.local"]
+        env_file_encoding = 'utf-8'
+        extra = 'ignore'
 
 
 settings = Settings()
