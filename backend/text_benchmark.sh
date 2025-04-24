@@ -1,7 +1,7 @@
 SPLIT_RATIO=0.8
 LLM="gpt-4o"
 SCORE_THRESHOLD=0.35
-MAX_SAMPLES=100
+MAX_SAMPLES=1
 
 EMBEDDING_MODELS=("text-embedding-ada-002" "text-embedding-3-small" "text-embedding-3-large")
 CHUNK_SIZES=(512 1024)

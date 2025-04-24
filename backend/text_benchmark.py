@@ -156,7 +156,7 @@ async def run_benchmark(args):
 
     logs_dir = Path(__file__).parent / "logs"
     logs_dir.mkdir(exist_ok=True)
-    model_dir = logs_dir / f"chunk_size_{args.chunk_size}_{args.model}"
+    model_dir = logs_dir / f"k_{args.k}_chunk_size_{args.chunk_size}_{args.model}"
     model_dir.mkdir(exist_ok=True)
 
     # Configure logger handler
