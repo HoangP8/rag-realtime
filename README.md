@@ -75,12 +75,20 @@ python agent.py dev
 ```
 
 **Evaluate the Backend Agent:**
+To evaluate the backend agent's performance with RAG, follow these steps:
 
-To evaluate the backend agent's performance with RAG, you can vary parameters such as chunk size, embedding models, and the number of relevant documents retrieved:
+1. Connect to Hugging Face by running the following command in your terminal:
 
-```sh
-bash text_benchmark.sh
-```
+    ```sh
+    huggingface-cli login
+    ```
+2. Run the evaluation script:
+
+    ```sh
+    bash text_benchmark.sh
+    ```
+    you can vary parameters such as chunk size, embedding models, and the number of relevant documents retrieved.
+
 
 ### 5. 🖥️ Set Up the Frontend
 
