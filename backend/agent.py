@@ -4,7 +4,7 @@ import os
 import time
 from dotenv import load_dotenv
 from pathlib import Path
-from typing import Annotated, Dict, List
+from typing import Annotated, Dict, List, Optional, Any
 import asyncio
 import langid
 import json
@@ -21,7 +21,7 @@ logger = logging.getLogger("voice-agent")
 logger.setLevel(logging.INFO)
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.DEBUG)
-log_dir = Path(__file__).parent / "logs"
+log_dir = Path(__file__).parent / "logs" / "talk_logs"
 log_dir.mkdir(parents=True, exist_ok=True) 
 log_file_path = log_dir / "medical_assistant.log"
 file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
@@ -63,7 +63,7 @@ class MedicalFunctionContext(llm.FunctionContext):
         self.query_metrics: List[Dict] = []
     
     @llm.ai_callable()
-    async def search_medical_info(
+    async def rag_search_medical(
         self,
         query: Annotated[str, llm.TypeInfo(description="Medical query to search within the documents")],
         language: Annotated[str, llm.TypeInfo(description="Language of the query (en or vi)")] = "vi",
@@ -151,13 +151,13 @@ class MedicalMultimodalAgent(MultimodalAgent):
     def __init__(
         self,
         *,
-        model,
-        vectorstore,
-        vad=None,
-        chat_ctx=None,
-        fnc_ctx=None,
+        model: openai.realtime.RealtimeModel,
+        vectorstore: FAISS,
+        vad: Optional[Any] = None,
+        chat_ctx: Optional[llm.ChatContext] = None,
+        fnc_ctx: Optional[llm.FunctionContext] = None,
         transcription=AgentTranscriptionOptions(),
-        loop=None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
     ):
         # Initialize RAG function context
         self.med_fnc_ctx = MedicalFunctionContext(vectorstore=vectorstore)
@@ -174,8 +174,8 @@ class MedicalMultimodalAgent(MultimodalAgent):
         )
         
         # State tracking variables
-        self.conversation_history = []
-        self.current_language = "en"
+        self.conversation_history: List[Dict[str, Any]] = []
+        self.current_language: str = "en"
         self.setup_event_listeners()
     
     def setup_event_listeners(self):
@@ -217,7 +217,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
                           f"Query: {msg}\nDetected Language: {self.current_language}")
     
         # Perform RAG search
-        result = await self.med_fnc_ctx.search_medical_info(
+        result = await self.med_fnc_ctx.rag_search_medical(
             query=msg, 
             language=self.current_language
         )
@@ -314,7 +314,7 @@ async def entrypoint(ctx: JobContext):
     # Warm-up RAG system with dummy query (important to reduce latency at first query)
     warmup_start = time.time()
     log_with_separator(root_logger, "SYSTEM WARMUP", "Starting RAG warm-up...")
-    await assistant.med_fnc_ctx.search_medical_info(query="How are you today?", language="en", k=3, score_threshold=0.35)
+    await assistant.med_fnc_ctx.rag_search_medical(query="How are you today?", language="en", k=3, score_threshold=0.35)
     warmup_time = time.time() - warmup_start
     log_with_separator(root_logger, "SYSTEM WARMUP", f"RAG warm-up completed in {warmup_time:.4f} seconds.")
     

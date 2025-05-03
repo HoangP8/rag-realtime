@@ -19,8 +19,8 @@ from ragas.metrics import AnswerRelevancy, AnswerCorrectness, ContextRecall, Con
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logs_dir = Path(__file__).parent / "logs"
-logs_dir.mkdir(exist_ok=True)
+logs_dir = Path(__file__).parent / "logs" / "text_benchmark_logs"
+logs_dir.mkdir(parents=True, exist_ok=True)
 metrics_logger = logging.getLogger("metrics")
 metrics_logger.setLevel(logging.INFO)
 qa_logger = logging.getLogger("qa_logs")
