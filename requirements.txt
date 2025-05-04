@@ -8,10 +8,9 @@ deepgram-sdk
 sentencepiece
 openai
 livekit-agents~=0.12.20
-livekit-plugins-openai~=0.11.3
-livekit-plugins-deepgram>=0.6.8
-livekit-plugins-silero~=0.7.2
-livekit-plugins-noise-cancellation
+livekit-plugins-openai~=0.12.3
+livekit-plugins-deepgram~=0.7.3
+livekit-plugins-silero~=0.7.5
 python-dotenv
 langchain
 langchain_community

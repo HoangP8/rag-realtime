@@ -63,7 +63,7 @@ class MedicalFunctionContext(llm.FunctionContext):
         self.query_metrics: List[Dict] = []
     
     @llm.ai_callable()
-    async def rag_search_medical(
+    async def rag_search(
         self,
         query: Annotated[str, llm.TypeInfo(description="Medical query to search within the documents")],
         language: Annotated[str, llm.TypeInfo(description="Language of the query (en or vi)")] = "vi",
@@ -187,7 +187,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
             logger.info(f"User speech committed: {json.dumps(msg, ensure_ascii=False)}")
             self.conversation_history.append({"role": "user", "content": msg, "timestamp": speech_time})
             log_with_separator(root_logger, "SPEECH FRAGMENT", msg)
-            asyncio.create_task(self.process_committed_transcript(msg))
+            asyncio.create_task(self.process_committed_transcript(msg)) # pass the message to RAG search
         
         @self.on("agent_speech_committed")
         def on_agent_speech_committed(speech_data):
@@ -217,7 +217,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
                           f"Query: {msg}\nDetected Language: {self.current_language}")
     
         # Perform RAG search
-        result = await self.med_fnc_ctx.rag_search_medical(
+        result = await self.med_fnc_ctx.rag_search(
             query=msg, 
             language=self.current_language
         )
@@ -314,7 +314,7 @@ async def entrypoint(ctx: JobContext):
     # Warm-up RAG system with dummy query (important to reduce latency at first query)
     warmup_start = time.time()
     log_with_separator(root_logger, "SYSTEM WARMUP", "Starting RAG warm-up...")
-    await assistant.med_fnc_ctx.rag_search_medical(query="How are you today?", language="en", k=3, score_threshold=0.35)
+    await assistant.med_fnc_ctx.rag_search(query="How are you today?", language="en", k=3, score_threshold=0.35)
     warmup_time = time.time() - warmup_start
     log_with_separator(root_logger, "SYSTEM WARMUP", f"RAG warm-up completed in {warmup_time:.4f} seconds.")
     

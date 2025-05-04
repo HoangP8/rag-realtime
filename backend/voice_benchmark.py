@@ -11,14 +11,26 @@ from livekit.plugins import openai, deepgram, silero
 
 # Load environment variables
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
-AGENT_TYPE = "multimodal"
+
+# Change this to one of these two agent types: "voice_pipeline" or "multimodal"
+AGENT_TYPE = "voice_pipeline"
+
+# Set up models for voice pipeline agent
+STT_MODEL = "whisper-1"       # vary with whisper-1, gpt-4o-mini-transcribe, nova-2-general, nova-3-general
+LLM_MODEL = "gpt-4o-mini"     # vary with gpt-4o, gpt-4o-mini
+TTS_MODEL = "tts-1"           # vary with tts-1, tts-1-hd, gpt-4o-mini-tts
 
 # Set up logging
 logger = logging.getLogger("voice-agent")
 logger.setLevel(logging.INFO)
 log_dir = Path(__file__).parent / "logs" / "voice_benchmark_logs"
 log_dir.mkdir(parents=True, exist_ok=True)
-log_file = log_dir / f"latency_{AGENT_TYPE}.log"
+log_file_name_base = f"latency_{AGENT_TYPE}"
+if AGENT_TYPE == "voice_pipeline":
+    log_file_name = f"{log_file_name_base}_stt-{STT_MODEL}_llm-{LLM_MODEL}_tts-{TTS_MODEL}.log"
+else:
+    log_file_name = f"{log_file_name_base}.log"
+log_file = log_dir / log_file_name
 file_handler = logging.FileHandler(log_file, encoding='utf-8')
 console_handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -87,17 +99,23 @@ async def voice_entrypoint(ctx: JobContext):
     # Connect to room
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     participant = await ctx.wait_for_participant()
-    
+
+    # Vary with OpenAI or Deepgram STT models
+    if STT_MODEL == "whisper-1" or "gpt-4o-mini-transcribe":
+        stt_plugin = openai.STT(model=STT_MODEL)
+        logger.info(f"Using OpenAI STT with model: {STT_MODEL}")
+    else:
+        stt_plugin = deepgram.STT(model=STT_MODEL)
+        logger.info(f"Using Deepgram STT with model: {STT_MODEL}")
+
     # Set up voice pipeline agent
     agent = VoicePipelineAgent(
         vad=silero.VAD.load(),
-        stt=deepgram.STT(
-            model="nova-2-general",  # whisper-base, nova-2-general, whisper-medium
-        ),
-        llm=openai.LLM(model="gpt-4o"),
+        stt=stt_plugin,
+        llm=openai.LLM(model=LLM_MODEL),
         tts=openai.TTS(
-            model="tts-1",  # tts-1-hd
-            voice="coral"),  # automatically recognize input language
+            model=TTS_MODEL,  
+            voice="coral"),
         chat_ctx=chat_ctx,
     )
     
