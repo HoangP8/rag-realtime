@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 load_dotenv()
 load_dotenv(".env.local")
 
+# print(f"supabase env keys: {os.getenv('NEXT_PUBLIC_SUPABASE_URL')}, {os.getenv('NEXT_PUBLIC_SUPABASE_ANON_KEY')}")
+
 # Base URL for the API
 BASE_URL = "http://localhost:8000"
 
@@ -51,10 +53,10 @@ def login(email, password):
     response = requests.post(url, json=data)
     print("Login Response:")
     print_response(response)
-    
+
     if response.status_code == 200:
         TOKEN = response.json().get("access_token")
-        print(f"Token: {TOKEN}")
+        print(f"Token: {TOKEN} \n")
     return response
 
 def get_conversations():
@@ -145,49 +147,78 @@ def get_user_profile():
     print_response(response)
     return response
 
+def register_user(email, password, first_name="Test", last_name="User"):
+    """Register a new user"""
+    url = f"{BASE_URL}/api/v1/auth/register"
+    data = {
+        "email": email,
+        "password": password,
+        "first_name": first_name,
+        "last_name": last_name
+    }
+    response = requests.post(url, json=data)
+    print("Register User Response:")
+    print_response(response)
+    return response
+
 def run_tests():
     """Run all tests"""
     # Get email and password from environment variables or prompt user
     email = os.getenv("TEST_EMAIL")
     password = os.getenv("TEST_PASSWORD")
-    
+
     if not email or not password:
         email = input("Enter your email: ")
         password = input("Enter your password: ")
-    
+
+    # Try to register first (this might fail if the user already exists)
+    # register_response = register_user(email, password)
+    # print(f"Registration attempt status: {register_response.status_code}")
+
     # Login
     login_response = login(email, password)
     if login_response.status_code != 200:
+        print(f"Email: {email}, Password: {password}")
         print("Login failed. Exiting.")
         return
-    
+
     # Get conversations
-    get_conversations()
-    
+    # get_conversations()
+
     # Create a conversation
     create_response = create_conversation()
     if create_response.status_code != 201:
         print("Failed to create conversation. Exiting.")
         return
-    
+
     conversation_id = create_response.json().get("id")
-    
+
     # Get the created conversation
-    get_conversation(conversation_id)
-    
+    # get_conversation(conversation_id)
+
     # Create a message
-    create_message(conversation_id)
-    
+    # create_message(conversation_id)
+
     # Get messages
-    get_messages(conversation_id)
-    
+    # get_messages(conversation_id)
+
     # Create a voice session
     voice_response = create_voice_session(conversation_id)
     if voice_response.status_code == 200:
         session_id = voice_response.json().get("id")
         # Get voice session status
         get_voice_session_status(session_id)
-    
+
+        # Delete voice session
+        delete_voice_response = requests.delete(f"{BASE_URL}/api/v1/voice/session/{session_id}", headers={"Authorization": f"Bearer {TOKEN}"})
+        print(f"Delete Voice Session Response:")
+        print_response(delete_voice_response)
+
+    # Delete test conversation
+    delete_response = requests.delete(f"{BASE_URL}/api/v1/conversations/{conversation_id}", headers={"Authorization": f"Bearer {TOKEN}"})
+    print(f"Delete Conversation Response:")
+    print_response(delete_response)
+
     # Get user profile
     get_user_profile()
 

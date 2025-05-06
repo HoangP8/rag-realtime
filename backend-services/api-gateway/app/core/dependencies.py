@@ -46,15 +46,21 @@ def get_profile_service():
     return ProfileService(supabase)
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UUID:
-    """Get current user from token"""
+async def get_current_user_and_token(token: str = Depends(oauth2_scheme)):
+    """Get current user and token"""
     auth_service = get_auth_service()
+    # print(f"Auth Token: {token}")
     try:
         user_id = await auth_service.validate_token(token)
-        return user_id
+        return {"user_id": user_id, "token": token}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> UUID:
+    """Get current user from token"""
+    user_data = await get_current_user_and_token(token)
+    return user_data["user_id"]

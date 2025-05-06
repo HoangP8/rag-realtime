@@ -4,9 +4,13 @@ Configuration settings for the Auth Service
 import os
 from typing import List, Union
 
+from dotenv import load_dotenv
 from pydantic import AnyHttpUrl, validator
 from pydantic_settings import BaseSettings
 
+# Load environment variables first
+load_dotenv()
+load_dotenv(".env.local")
 
 class Settings(BaseSettings):
     """Application settings"""

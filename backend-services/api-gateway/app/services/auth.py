@@ -150,7 +150,7 @@ class AuthService:
                 user_data = response.json()
 
                 # Return user ID
-                return UUID(user_data["id"])
+                return UUID(user_data["user_id"])
 
         except Exception as e:
             self.logger.error(f"Error validating token: {str(e)}")

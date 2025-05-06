@@ -1,0 +1,40 @@
+"""
+Voice service models
+"""
+from datetime import datetime
+from typing import Dict, Optional, Any
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+class VoiceSessionBase(BaseModel):
+    """Base voice session model"""
+    conversation_id: Optional[UUID] = Field(None, description="Associated conversation ID")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+
+class VoiceSessionCreate(VoiceSessionBase):
+    """Voice session creation model"""
+    pass
+
+
+class VoiceSessionConfig(BaseModel):
+    """Voice session configuration model"""
+    voice_settings: Optional[Dict[str, Any]] = Field(None, description="Voice settings")
+    transcription_settings: Optional[Dict[str, Any]] = Field(None, description="Transcription settings")
+
+
+class VoiceSessionResponse(VoiceSessionBase):
+    """Voice session response model"""
+    id: str
+    user_id: UUID
+    status: str
+    token: str  # User token for client use
+    assistant_token: Optional[str] = None  # Optional assistant token (only included in internal responses)
+    created_at: datetime
+    config: VoiceSessionConfig
+
+    class Config:
+        """Pydantic config"""
+        orm_mode = True

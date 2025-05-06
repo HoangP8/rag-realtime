@@ -66,19 +66,35 @@ async def validate_user_id(authorization: str = Header(...)) -> UUID:
 
     token = authorization.replace("Bearer ", "")
 
-    # In a real microservice architecture, we would call the auth service
-    # For simplicity, we'll validate directly with Supabase
-    supabase = get_supabase_client()
-
     try:
-        # Set auth token for the client
-        supabase.auth.set_session(token)
+        # First try to parse the token as a UUID (for API gateway communication)
+        try:
+            return {"token": token, "user_id": UUID(token)}
+        except ValueError:
+            pass
 
-        # Get user data
-        user = supabase.auth.get_user()
+        # If not a UUID, validate as a JWT token with Supabase
+        supabase = get_supabase_client()
 
-        # Return user ID
-        return UUID(user.user.id)
+        try:
+            # Set auth token for the client
+            # Note: We don't set the session here because we need to do it
+            # before each database operation to ensure it's always set
+
+            # Get user data
+            user = supabase.auth.get_user(token)
+
+            # Return user ID
+            return {
+                "token": token,
+                "user_id": UUID(user.user.id)
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     except Exception as e:
         raise HTTPException(

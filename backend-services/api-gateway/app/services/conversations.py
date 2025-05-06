@@ -31,11 +31,11 @@ class ConversationService:
         if not self.conversation_service_url:
             self.conversation_service_url = "http://localhost:8002"
 
-    async def get_user_conversations(self, user_id: UUID) -> List[ConversationResponse]:
+    async def get_user_conversations(self, user_id: UUID, token: str) -> List[ConversationResponse]:
         """Get all conversations for a user"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call conversation service API
             async with httpx.AsyncClient() as client:
@@ -71,11 +71,11 @@ class ConversationService:
             self.logger.error(f"Error getting user conversations: {str(e)}")
             raise
 
-    async def create_conversation(self, user_id: UUID, data: ConversationCreate) -> ConversationResponse:
+    async def create_conversation(self, user_id: UUID, data: ConversationCreate, token: str) -> ConversationResponse:
         """Create a new conversation"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Prepare request data
             request_data = {
@@ -108,11 +108,11 @@ class ConversationService:
             self.logger.error(f"Error creating conversation: {str(e)}")
             raise
 
-    async def get_conversation(self, user_id: UUID, conversation_id: UUID) -> Optional[ConversationResponse]:
+    async def get_conversation(self, conversation_id: UUID, token: str) -> Optional[ConversationResponse]:
         """Get a specific conversation"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call conversation service API
             async with httpx.AsyncClient() as client:
@@ -140,12 +140,12 @@ class ConversationService:
             raise
 
     async def update_conversation(
-        self, user_id: UUID, conversation_id: UUID, data: ConversationUpdate
+        self, conversation_id: UUID, data: ConversationUpdate, token: str
     ) -> Optional[ConversationResponse]:
         """Update a conversation"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Prepare update data
             update_data = {}
@@ -184,11 +184,11 @@ class ConversationService:
             self.logger.error(f"Error updating conversation: {str(e)}")
             raise
 
-    async def delete_conversation(self, user_id: UUID, conversation_id: UUID) -> bool:
+    async def delete_conversation(self, conversation_id: UUID, token: str) -> bool:
         """Delete a conversation"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call conversation service API
             async with httpx.AsyncClient() as client:
@@ -211,11 +211,11 @@ class ConversationService:
             self.logger.error(f"Error deleting conversation: {str(e)}")
             raise
 
-    async def get_conversation_messages(self, user_id: UUID, conversation_id: UUID) -> List[MessageResponse]:
+    async def get_conversation_messages(self, conversation_id: UUID, token: str) -> List[MessageResponse]:
         """Get all messages for a conversation"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call conversation service API
             async with httpx.AsyncClient() as client:
@@ -247,12 +247,12 @@ class ConversationService:
             raise
 
     async def create_message(
-        self, user_id: UUID, conversation_id: UUID, data: MessageCreate
+        self, conversation_id: UUID, data: MessageCreate, token: str
     ) -> MessageResponse:
         """Create a new message in a conversation"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Prepare message data
             message_data = {

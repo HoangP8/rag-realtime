@@ -53,3 +53,30 @@ async def refresh_token(refresh_token: str, auth_service: AuthService = Depends(
 async def logout(auth_service: AuthService = Depends(get_auth_service)):
     """Logout a user"""
     return {"message": "Successfully logged out"}
+
+
+# @router.get("/validate")
+# async def validate_token(token: str = None, authorization: str = None, auth_service: AuthService = Depends(get_auth_service)):
+#     """Validate a token"""
+#     try:
+#         # Try to get token from query parameter
+#         if token:
+#             pass
+#         # Try to get token from Authorization header
+#         elif authorization and authorization.startswith("Bearer "):
+#             token = authorization.replace("Bearer ", "")
+#         else:
+#             raise HTTPException(
+#                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+#                 detail="Token is required either as a query parameter or in the Authorization header"
+#             )
+
+#         user_id = await auth_service.validate_token(token)
+#         return {"user_id": str(user_id), "valid": True}
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Invalid token"
+#         )

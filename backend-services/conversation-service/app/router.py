@@ -21,12 +21,15 @@ router = APIRouter()
 
 @router.get("/conversations", response_model=List[ConversationResponse])
 async def get_conversations(
-    user_id: UUID = Depends(validate_user_id),
+    user_data: UUID = Depends(validate_user_id),
     conversation_service: ConversationService = Depends(get_conversation_service)
 ):
     """Get all conversations for the current user"""
+    # print(f"user id: {user_id}")
     try:
-        conversations = await conversation_service.get_user_conversations(user_id)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        conversations = await conversation_service.get_user_conversations(user_id, token)
         return conversations
     except Exception as e:
         raise HTTPException(
@@ -38,12 +41,14 @@ async def get_conversations(
 @router.post("/conversations", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
 async def create_conversation(
     conversation_data: ConversationCreate,
-    user_id: UUID = Depends(validate_user_id),
+    user_data: UUID = Depends(validate_user_id),
     conversation_service: ConversationService = Depends(get_conversation_service)
 ):
     """Create a new conversation"""
     try:
-        conversation = await conversation_service.create_conversation(user_id, conversation_data)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        conversation = await conversation_service.create_conversation(user_id, token, conversation_data)
         return conversation
     except Exception as e:
         raise HTTPException(
@@ -55,12 +60,14 @@ async def create_conversation(
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
 async def get_conversation(
     conversation_id: UUID,
-    user_id: UUID = Depends(validate_user_id),
+    user_data: UUID = Depends(validate_user_id),
     conversation_service: ConversationService = Depends(get_conversation_service)
 ):
     """Get a specific conversation"""
     try:
-        conversation = await conversation_service.get_conversation(user_id, conversation_id)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        conversation = await conversation_service.get_conversation(user_id, token, conversation_id)
         if not conversation:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -80,13 +87,15 @@ async def get_conversation(
 async def update_conversation(
     conversation_id: UUID,
     conversation_data: ConversationUpdate,
-    user_id: UUID = Depends(validate_user_id),
+    user_data: UUID = Depends(validate_user_id),
     conversation_service: ConversationService = Depends(get_conversation_service)
 ):
     """Update a conversation"""
     try:
+        user_id = user_data["user_id"]
+        token = user_data["token"]
         conversation = await conversation_service.update_conversation(
-            user_id, conversation_id, conversation_data
+            user_id, token, conversation_id, conversation_data
         )
         if not conversation:
             raise HTTPException(
@@ -106,12 +115,14 @@ async def update_conversation(
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_conversation(
     conversation_id: UUID,
-    user_id: UUID = Depends(validate_user_id),
+    user_data: UUID = Depends(validate_user_id),
     conversation_service: ConversationService = Depends(get_conversation_service)
 ):
     """Delete a conversation"""
     try:
-        success = await conversation_service.delete_conversation(user_id, conversation_id)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        success = await conversation_service.delete_conversation(user_id, token, conversation_id)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -130,12 +141,14 @@ async def delete_conversation(
 @router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
 async def get_messages(
     conversation_id: UUID,
-    user_id: UUID = Depends(validate_user_id),
+    user_data: UUID = Depends(validate_user_id),
     conversation_service: ConversationService = Depends(get_conversation_service)
 ):
     """Get all messages for a conversation"""
     try:
-        messages = await conversation_service.get_conversation_messages(user_id, conversation_id)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        messages = await conversation_service.get_conversation_messages(user_id, token, conversation_id)
         return messages
     except Exception as e:
         raise HTTPException(
@@ -148,12 +161,14 @@ async def get_messages(
 async def create_message(
     conversation_id: UUID,
     message_data: MessageCreate,
-    user_id: UUID = Depends(validate_user_id),
+    user_data: UUID = Depends(validate_user_id),
     conversation_service: ConversationService = Depends(get_conversation_service)
 ):
     """Create a new message in a conversation"""
     try:
-        message = await conversation_service.create_message(user_id, conversation_id, message_data)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        message = await conversation_service.create_message(user_id, token, conversation_id, message_data)
         return message
     except Exception as e:
         raise HTTPException(

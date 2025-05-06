@@ -23,19 +23,32 @@ logger = logging.getLogger(__name__)
 async def create_voice_session(
     session_data: VoiceSessionCreate,
     session_manager: SessionManager = Depends(get_session_manager),
-    user_id: UUID = Depends(validate_user_id),
+    user_data: Dict = Depends(validate_user_id),
     supabase = Depends(get_supabase_client)
 ):
     """Create a new voice session"""
     try:
+        user_id = user_data["user_id"]
+        auth_token = user_data["token"]
+
         # Create LiveKit session
         livekit_session = LiveKitSession()
-        livekit_data = await livekit_session.create_session(
+        livekit_data = livekit_session.create_session(
             user_id,
             metadata=session_data.metadata
         )
 
-        # Default config
+        # print(f"LiveKit data: {livekit_data}")
+
+        # Prepare session data
+        session_id = livekit_data["id"]
+        room_name = livekit_data["room_name"]
+        user_token = livekit_data["user_token"]
+        assistant_token = livekit_data["assistant_token"]
+        metadata = session_data.metadata or {}
+        conversation_id = session_data.conversation_id
+
+        # Default voice config
         config = VoiceSessionConfig(
             voice_settings={
                 "voice_id": "alloy",  # OpenAI voice
@@ -50,23 +63,20 @@ async def create_voice_session(
             }
         )
 
-        # Prepare session data
-        session_id = livekit_data["id"]
-        room_name = livekit_data["room_name"]
-        token = livekit_data["token"]
-        metadata = session_data.metadata or {}
-        conversation_id = session_data.conversation_id
-
         # Store session in database
         session_db_data = {
             "id": session_id,
             "user_id": str(user_id),
             "conversation_id": str(conversation_id) if conversation_id else None,
             "status": "active",
-            "token": token,
+            "token": user_token,  # Store user token for client use
+            "assistant_token": assistant_token,  # Store assistant token for internal use
             "metadata": metadata,
             "config": config.dict()
         }
+
+        # Set the auth token for the Supabase client
+        supabase.auth.set_session(auth_token, refresh_token="")
 
         # Store session in database
         response = supabase.table("voice_sessions") \
@@ -78,6 +88,7 @@ async def create_voice_session(
             session_id=session_id,
             user_id=user_id,
             room_name=room_name,
+            token=assistant_token,  # Use the assistant token for the voice agent
             config=config,
             conversation_id=conversation_id,
             metadata=metadata
@@ -89,7 +100,8 @@ async def create_voice_session(
             user_id=user_id,
             conversation_id=conversation_id,
             status="active",
-            token=token,
+            token=user_token,  # Return the user token to the client
+            assistant_token=assistant_token,  # Include the assistant token in the response
             metadata=metadata,
             config=config,
             created_at=response.data[0]["created_at"]
@@ -107,13 +119,19 @@ async def create_voice_session(
 async def get_voice_session_status(
     session_id: str,
     session_manager: SessionManager = Depends(get_session_manager),
-    user_id: UUID = Depends(validate_user_id),
+    user_data: Dict = Depends(validate_user_id),
     supabase = Depends(get_supabase_client)
 ):
     """Get status of a voice session"""
     try:
+        user_id = user_data["user_id"]
+        user_token = user_data["token"]
+
         # Check if session exists in session manager
         agent = await session_manager.get_session(session_id)
+
+        # Set the auth token for the Supabase client
+        supabase.auth.set_session(user_token, refresh_token="")
 
         # Get session from database
         response = supabase.table("voice_sessions") \
@@ -137,6 +155,7 @@ async def get_voice_session_status(
             conversation_id=UUID(session_data["conversation_id"]) if session_data["conversation_id"] else None,
             status="active" if agent else "inactive",
             token=session_data["token"],
+            assistant_token=session_data["assistant_token"],
             metadata=session_data["metadata"],
             config=VoiceSessionConfig(**session_data["config"]),
             created_at=session_data["created_at"]
@@ -156,11 +175,17 @@ async def get_voice_session_status(
 async def delete_voice_session(
     session_id: str,
     session_manager: SessionManager = Depends(get_session_manager),
-    user_id: UUID = Depends(validate_user_id),
+    user_data: Dict = Depends(validate_user_id),
     supabase = Depends(get_supabase_client)
 ):
     """Delete a voice session"""
     try:
+        user_id = user_data["user_id"]
+        user_token = user_data["token"]
+
+        # Set the auth token for the Supabase client
+        supabase.auth.set_session(user_token, refresh_token="")
+
         # Check if session exists in database
         response = supabase.table("voice_sessions") \
             .select("id") \
@@ -179,9 +204,9 @@ async def delete_voice_session(
 
         # Delete LiveKit session
         livekit_session = LiveKitSession()
-        await livekit_session.delete_session(session_id)
+        livekit_session.delete_session(session_id)
 
-        # Delete session from database
+        # Delete session from database (token already set above)
         supabase.table("voice_sessions") \
             .delete() \
             .eq("id", session_id) \

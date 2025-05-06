@@ -17,7 +17,7 @@ def get_supabase_client() -> Client:
     """
     url = settings.SUPABASE_URL
     key = settings.SUPABASE_ANON_KEY
-    
+
     if not url or not key:
         raise ValueError("Supabase URL and key must be provided")
     

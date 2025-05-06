@@ -14,7 +14,7 @@ from app.schemas.conversations import (
     MessageResponse
 )
 from app.services.conversations import ConversationService
-from app.core.dependencies import get_conversation_service, get_current_user
+from app.core.dependencies import get_conversation_service, get_current_user_and_token
 
 router = APIRouter()
 
@@ -22,11 +22,15 @@ router = APIRouter()
 @router.get("/", response_model=List[ConversationResponse])
 async def get_conversations(
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Get all conversations for the current user"""
     try:
-        conversations = await conversation_service.get_user_conversations(user_id)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        # print(f"User ID: {user_id}")
+        # print(f"Token: {token}")
+        conversations = await conversation_service.get_user_conversations(user_id, token)
         return conversations
     except Exception as e:
         raise HTTPException(
@@ -39,11 +43,15 @@ async def get_conversations(
 async def create_conversation(
     conversation_data: ConversationCreate,
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Create a new conversation"""
     try:
-        conversation = await conversation_service.create_conversation(user_id, conversation_data)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        # print(f"User ID: {user_id}")
+        # print(f"Token: {token}")
+        conversation = await conversation_service.create_conversation(user_id, conversation_data, token)
         return conversation
     except Exception as e:
         raise HTTPException(
@@ -56,11 +64,12 @@ async def create_conversation(
 async def get_conversation(
     conversation_id: UUID,
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Get a specific conversation"""
     try:
-        conversation = await conversation_service.get_conversation(user_id, conversation_id)
+        token = user_data["token"]
+        conversation = await conversation_service.get_conversation(conversation_id, token)
         if not conversation:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -81,12 +90,13 @@ async def update_conversation(
     conversation_id: UUID,
     conversation_data: ConversationUpdate,
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Update a conversation"""
     try:
+        token = user_data["token"]
         conversation = await conversation_service.update_conversation(
-            user_id, conversation_id, conversation_data
+            conversation_id, conversation_data, token
         )
         if not conversation:
             raise HTTPException(
@@ -107,11 +117,12 @@ async def update_conversation(
 async def delete_conversation(
     conversation_id: UUID,
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Delete a conversation"""
     try:
-        success = await conversation_service.delete_conversation(user_id, conversation_id)
+        token = user_data["token"]
+        success = await conversation_service.delete_conversation(conversation_id, token)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -131,11 +142,12 @@ async def delete_conversation(
 async def get_messages(
     conversation_id: UUID,
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Get all messages for a conversation"""
     try:
-        messages = await conversation_service.get_conversation_messages(user_id, conversation_id)
+        token = user_data["token"]
+        messages = await conversation_service.get_conversation_messages(conversation_id, token)
         return messages
     except Exception as e:
         raise HTTPException(
@@ -149,11 +161,12 @@ async def create_message(
     conversation_id: UUID,
     message_data: MessageCreate,
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Create a new message in a conversation"""
     try:
-        message = await conversation_service.create_message(user_id, conversation_id, message_data)
+        token = user_data["token"]
+        message = await conversation_service.create_message(conversation_id, message_data, token)
         return message
     except Exception as e:
         raise HTTPException(

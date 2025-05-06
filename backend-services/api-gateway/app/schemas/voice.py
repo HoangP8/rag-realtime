@@ -30,7 +30,8 @@ class VoiceSessionResponse(VoiceSessionBase):
     id: str
     user_id: UUID
     status: str
-    token: str
+    token: str  # User token for client use
+    assistant_token: Optional[str] = None  # Optional assistant token (only included in internal responses)
     created_at: datetime
     config: VoiceSessionConfig
 

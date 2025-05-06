@@ -21,10 +21,10 @@ def get_supabase_client() -> Client:
     """
     url = settings.SUPABASE_URL
     key = settings.SUPABASE_ANON_KEY
-    
+
     if not url or not key:
         raise ValueError("Supabase URL and key must be provided")
-    
+
     return create_client(url, key)
 
 
@@ -42,29 +42,45 @@ def get_conversation_service() -> ConversationService:
 
 async def validate_user_id(authorization: str = Header(...)) -> UUID:
     """Validate user ID from authorization header"""
+    # print(f"Authorization header: {authorization}")
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     token = authorization.replace("Bearer ", "")
-    
-    # In a real microservice architecture, we would call the auth service
-    # For simplicity, we'll validate directly with Supabase
-    supabase = get_supabase_client()
-    
+
     try:
-        # Set auth token for the client
-        supabase.auth.set_session(token)
-        
-        # Get user data
-        user = supabase.auth.get_user()
-        
-        # Return user ID
-        return UUID(user.user.id)
-    
+        # First try to parse the token as a UUID (for API gateway communication)
+        try:
+            return {"token": token, "user_id": UUID(token)}
+        except ValueError:
+            pass
+
+        # If not a UUID, validate as a JWT token with Supabase
+        supabase = get_supabase_client()
+
+        try:
+            # Set auth token for the client
+            # supabase.auth.set_session(token)
+
+            # Get user data
+            user = supabase.auth.get_user(token)
+
+            # Return user ID
+            return {
+                "token": token,
+                "user_id": UUID(user.user.id)
+            } 
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

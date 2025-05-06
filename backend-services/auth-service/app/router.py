@@ -1,7 +1,7 @@
 """
 Auth service router
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 
 from app.models import UserCreate, UserLogin, UserResponse, TokenResponse
 from app.service import AuthService
@@ -56,11 +56,28 @@ async def logout(auth_service: AuthService = Depends(get_auth_service)):
 
 
 @router.get("/validate")
-async def validate_token(token: str, auth_service: AuthService = Depends(get_auth_service)):
+async def validate_token(token: str = None, authorization: str = Header(None), auth_service: AuthService = Depends(get_auth_service)):
     """Validate a token"""
+    # print(f"Token: {token} \n")
+    # print(f"Authorization: {authorization} \n")
     try:
+        # Try to get token from query parameter
+        if token:
+            pass
+        # Try to get token from Authorization header
+        elif authorization and authorization.startswith("Bearer "):
+            token = authorization.replace("Bearer ", "")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Token is required either as a query parameter or in the Authorization header"
+            )
+        # print(f"token: {token} \n")
         user_id = await auth_service.validate_token(token)
+        # print(f"user_id: {user_id}")
         return {"user_id": user_id, "valid": True}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

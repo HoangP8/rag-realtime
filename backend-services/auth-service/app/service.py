@@ -91,10 +91,10 @@ class AuthService:
         """Validate token and return user ID"""
         try:
             # Set auth token for the client
-            self.supabase.auth.set_session(token)
+            # self.supabase.auth.set_session()
             
             # Get user data
-            user = self.supabase.auth.get_user()
+            user = self.supabase.auth.get_user(token)
             
             # Return user ID
             return UUID(user.user.id)

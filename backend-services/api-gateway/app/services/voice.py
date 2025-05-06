@@ -26,7 +26,7 @@ class VoiceService:
         if not self.voice_service_url:
             self.voice_service_url = "http://localhost:8003"
 
-    async def create_session(self, user_id: UUID, data: VoiceSessionCreate) -> VoiceSessionResponse:
+    async def create_session(self, user_id: UUID, data: VoiceSessionCreate, token: str) -> VoiceSessionResponse:
         """Create a new voice session"""
         try:
             # Prepare request data
@@ -35,8 +35,8 @@ class VoiceService:
                 "metadata": data.metadata or {}
             }
 
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call voice service API
             async with httpx.AsyncClient() as client:
@@ -61,6 +61,7 @@ class VoiceService:
                     conversation_id=UUID(session_data["conversation_id"]) if session_data["conversation_id"] else None,
                     status=session_data["status"],
                     token=session_data["token"],
+                    assistant_token=session_data.get("assistant_token"),  # Include assistant token if available
                     metadata=session_data["metadata"],
                     created_at=session_data["created_at"],
                     config=VoiceSessionConfig(**session_data["config"])
@@ -70,11 +71,11 @@ class VoiceService:
             self.logger.error(f"Error creating voice session: {str(e)}")
             raise
 
-    async def delete_session(self, user_id: UUID, session_id: str) -> bool:
+    async def delete_session(self, session_id: str, token: str) -> bool:
         """Delete a voice session"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call voice service API
             async with httpx.AsyncClient() as client:
@@ -97,11 +98,11 @@ class VoiceService:
             self.logger.error(f"Error deleting voice session: {str(e)}")
             raise
 
-    async def get_session_status(self, user_id: UUID, session_id: str) -> Optional[VoiceSessionResponse]:
+    async def get_session_status(self, session_id: str, token: str) -> Optional[VoiceSessionResponse]:
         """Get status of a voice session"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call voice service API
             async with httpx.AsyncClient() as client:
@@ -128,6 +129,7 @@ class VoiceService:
                     conversation_id=UUID(session_data["conversation_id"]) if session_data["conversation_id"] else None,
                     status=session_data["status"],
                     token=session_data["token"],
+                    assistant_token=session_data.get("assistant_token"),  # Include assistant token if available
                     metadata=session_data["metadata"],
                     created_at=session_data["created_at"],
                     config=VoiceSessionConfig(**session_data["config"])
@@ -138,18 +140,18 @@ class VoiceService:
             raise
 
     async def update_session_config(
-        self, user_id: UUID, session_id: str, config: VoiceSessionConfig
+        self, session_id: str, config: VoiceSessionConfig, token: str
     ) -> Optional[VoiceSessionResponse]:
         """Update configuration of a voice session"""
         try:
-            # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            # Set authorization header with token
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call voice service API
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{self.voice_service_url}/api/v1/session/{session_id}/config",
-                    json=config.dict(),
+                    json=config.model_dump(),
                     headers=headers
                 )
 
@@ -171,6 +173,7 @@ class VoiceService:
                     conversation_id=UUID(session_data["conversation_id"]) if session_data["conversation_id"] else None,
                     status=session_data["status"],
                     token=session_data["token"],
+                    assistant_token=session_data.get("assistant_token"),  # Include assistant token if available
                     metadata=session_data["metadata"],
                     created_at=session_data["created_at"],
                     config=VoiceSessionConfig(**session_data["config"])
