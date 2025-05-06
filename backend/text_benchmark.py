@@ -19,8 +19,8 @@ from ragas.metrics import AnswerRelevancy, AnswerCorrectness, ContextRecall, Con
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logs_dir = Path(__file__).parent / "logs"
-logs_dir.mkdir(exist_ok=True)
+logs_dir = Path(__file__).parent / "logs" / "text_benchmark_logs"
+logs_dir.mkdir(parents=True, exist_ok=True)
 metrics_logger = logging.getLogger("metrics")
 metrics_logger.setLevel(logging.INFO)
 qa_logger = logging.getLogger("qa_logs")
@@ -46,13 +46,10 @@ def load_dataset_split(split_ratio: float, max_samples: int | None = None, is_tr
     # Split the dataset 
     total_rows = len(dataset)
     train_size = int(total_rows * split_ratio)
-    if is_train:
-        split_dataset = dataset.select(range(train_size))
-    else:
-        split_dataset = dataset.select(range(train_size, total_rows))
+    split_dataset = dataset.select(range(train_size)) if is_train else dataset.select(range(train_size, total_rows))
     
     # Randomly sample max_samples
-    if max_samples and max_samples < len(split_dataset):
+    if max_samples is not None and max_samples > 0 and max_samples < len(split_dataset):
         indices = random.sample(range(len(split_dataset)), min(max_samples, len(split_dataset)))
         return split_dataset.select(indices)
     return split_dataset
@@ -96,7 +93,7 @@ async def generate_answers(dataset: Dataset, vectorstore: FAISS = None, llm: Cha
         
         # Prepare prompt based on whether we have contexts
         system_prompt = template_prompt
-        if contexts:
+        if contexts != []:
             context_str = "\n\n---\n\n".join([f"RAG information {i+1}:\n{ctx}" for i, ctx in enumerate(contexts)])
             system_prompt += f"\n\nHướng dẫn: Đây là thông tin từ cơ sở dữ liệu y tế Việt Nam. \n{context_str}"
         
@@ -111,7 +108,7 @@ async def generate_answers(dataset: Dataset, vectorstore: FAISS = None, llm: Cha
         
         # Log results
         qa_logger.info(f"QUESTION: {question}")
-        if contexts:
+        if contexts != []:
             for i, ctx in enumerate(contexts):
                 qa_logger.info(f"CONTEXT {i+1}: {ctx}")
         qa_logger.info(f"{'RAG' if use_rag else 'BASELINE'} ANSWER: {answer}")
@@ -136,11 +133,11 @@ async def evaluate_dataset(dataset: Dataset, dataset_name: str):
     
     # Define metrics
     metrics = [
-        Faithfulness(),        # How factual is the answer based on context?
-        AnswerRelevancy(),     # How relevant is the answer to the question? (Uses LLM)
-        ContextPrecision(),    # Signal-to-noise ratio of retrieved context. (Uses LLM)
-        ContextRecall(),       # How much of the ground truth is covered by the context?
-        AnswerCorrectness(),   # Factual correctness compared to ground truth. (Uses LLM)
+        Faithfulness(),        # Answer's factual consistency with the contexts.
+        AnswerRelevancy(),     # Answer's relevance to the question
+        ContextPrecision(),    # Relevance of retrieved context
+        ContextRecall(),       # Coverage of ground truth by context
+        AnswerCorrectness(),   # Factual accuracy compared to ground truth
     ]
     
     # Run evaluation
@@ -154,12 +151,10 @@ async def run_benchmark(args):
     """Main benchmarking function."""
     start_run_time = time.time()
 
-    logs_dir = Path(__file__).parent / "logs"
-    logs_dir.mkdir(exist_ok=True)
-    model_dir = logs_dir / f"chunk_size_{args.chunk_size}_{args.model}"
+    # Create directory for logs
+    model_dir = logs_dir / f"k_{args.k}_chunk_size_{args.chunk_size}_{args.model}"
     model_dir.mkdir(exist_ok=True)
-
-    # Configure logger handler
+    
     metrics_handler = logging.FileHandler(model_dir / "text_metrics.log")
     metrics_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
     metrics_logger.addHandler(metrics_handler)
@@ -233,12 +228,8 @@ async def run_benchmark(args):
     # Log Results and save to CSV files
     for name, result in results.items():
         metrics_logger.info(f"RESULTS - {name}: {result}")
-    logs_dir = Path(__file__).parent / "logs"
-    logs_dir.mkdir(exist_ok=True)
-    model_dir = logs_dir / f"chunk_size_{args.chunk_size}_{args.model}"
-    model_dir.mkdir(exist_ok=True)
-    summary_data = {}
     
+    summary_data = {}
     for name, result in results.items():
         numeric_df = result.to_pandas().select_dtypes(include=['number'])
         result_dict_row = numeric_df.iloc[0].to_dict()

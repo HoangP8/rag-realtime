@@ -63,5 +63,6 @@ mobile-frontend/android/
 # virtual environment
 venv/
 
-# Global log files
+# results
 *.log
+*.csv
