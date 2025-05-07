@@ -125,9 +125,7 @@ async def voice_entrypoint(ctx: JobContext):
         "question_end": None,
         "current_question": None,
         "current_response": None
-    }
-    
-    # Set up event handlers for latency tracking
+    }    
     setup_latency_tracking(agent, state)
     
     # Connect and perform warm-up
@@ -165,9 +163,7 @@ async def multimodal_entrypoint(ctx: JobContext):
         "question_end": None,
         "current_question": None,
         "current_response": None
-    }
-    
-    # Set up event handlers for latency tracking
+    }    
     setup_latency_tracking(agent, state)
     
     # Connect and perform warm-up
@@ -179,7 +175,7 @@ async def multimodal_entrypoint(ctx: JobContext):
 
 
 def select_entrypoint():
-    # Select the appropriate agent entrypoint based on configuration
+    # Select the agent entrypoint based on configuration
     if AGENT_TYPE == "voice_pipeline":
         return voice_entrypoint
     elif AGENT_TYPE == "multimodal":

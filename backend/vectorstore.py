@@ -10,8 +10,8 @@ from datasets import load_dataset
 from langchain_core.documents import Document
 from tqdm import tqdm
 
+# Load environment variables
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
-
 
 def create_vector_store(model_name: str, chunk_size: int = 512, batch_size: int = 10000, split_ratio: float = 0.8) -> FAISS:
     """Create vector store from the training portion of medical_qa split of Vietnamese Healthcare dataset."""
@@ -45,7 +45,7 @@ def create_vector_store(model_name: str, chunk_size: int = 512, batch_size: int 
     
     print(f"Documents extracted: {len(documents)}")
     
-    # Use a text splitter that preserves question-answer relationships
+    # Use a text splitter to preserve question-answer relationships
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=50,
@@ -82,7 +82,7 @@ def create_vector_store(model_name: str, chunk_size: int = 512, batch_size: int 
                 }
             )
             final_docs.append(new_doc)
-    
+
     print(f"Created {len(final_docs)} chunks")
 
     embeddings = OpenAIEmbeddings(model=model_name)
@@ -101,7 +101,7 @@ def create_vector_store(model_name: str, chunk_size: int = 512, batch_size: int 
     vectorstore = None
     progress_bar = tqdm(total=total_chunks, desc="Processing", leave=True)
     start_time = time.time()
-    
+
     for i in range(0, total_chunks, batch_size):
         batch_end = min(i + batch_size, total_chunks)
         batch = final_docs[i:batch_end]
@@ -144,12 +144,10 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    # Extract values from arguments
     model_name = args.model
     chunk_size = args.chunk_size
     batch_size = args.batch_size
     split_ratio = args.split_ratio
-    
     total_start_time = time.time()
     
     # Create vector store
