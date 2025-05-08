@@ -1,0 +1,25 @@
+# This file contains benchmark prompts used to measure agent response latency.
+
+# English Prompts
+1. What are the common symptoms of the flu?
+2. Explain the difference between Type 1 and Type 2 diabetes.
+3. What's the capital of France? (Off-topic)
+4. I have a persistent cough, what could it be?
+5. Tell me something interesting about the human body. (Healthcare/General Knowledge)
+6. Are there any natural remedies for insomnia?
+7. How often should I exercise per week for good health?
+8. Can you recommend a good book? (Off-topic)
+9. What are the signs of a heart attack?
+10. Can you understand Vietnamese? (Language check)
+
+# Vietnamese Prompts
+11. Triệu chứng phổ biến của sốt xuất huyết là gì?
+12. Bạn có thể cho tôi biết về cách quản lý bệnh cao huyết áp không?
+13. Hôm nay là thứ mấy? (Off-topic)
+14. Tôi bị đau bụng, tôi nên làm gì?
+15. Bạn có nói được tiếng Anh không? (Language check)
+16. Kể cho tôi nghe về một địa điểm du lịch nổi tiếng ở Việt Nam. (Off-topic)
+17. Làm thế nào để giảm căng thẳng?
+18. Tôi nên ăn gì để tốt cho sức khỏe tim mạch?
+19. Bạn có thể giúp tôi tìm một bài hát được không? (Off-topic)
+20. Sự khác biệt giữa dị ứng và cảm lạnh là gì?

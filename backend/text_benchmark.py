@@ -59,14 +59,12 @@ def load_vectorstore(model_name: str, chunk_size: int):
     """Load FAISS vector store from disk."""
     start_time = time.time()
     backend_dir = Path(__file__).parent.absolute()
-    model_base_folder = os.path.join(backend_dir, "faiss", f"{model_name}")
-    model_folder = os.path.join(model_base_folder, f"chunk_size_{chunk_size}")
+    model_folder = os.path.join(backend_dir, "faiss", f"{model_name}", f"chunk_size_{chunk_size}")
 
     logger.info(f"Loading vectorstore from: {model_folder}")
     embeddings = OpenAIEmbeddings(model=model_name)
     vectorstore = FAISS.load_local(model_folder, embeddings, allow_dangerous_deserialization=True)
-    load_time = time.time() - start_time
-    logger.info(f"Vector store loaded in {load_time:.2f} seconds")
+    logger.info(f"Vector store loaded in {time.time() - start_time:.2f}s")
     return vectorstore, embeddings
 
 
@@ -174,110 +172,68 @@ async def run_benchmark(args):
     # Load Vector Store
     vectorstore, embeddings = load_vectorstore(args.model, args.chunk_size)
 
-    # Initialize LLM and Embeddings
+    # Initialize LLM
     llm = ChatOpenAI(model=args.llm, temperature=0.7) 
 
-    # Generate Baseline Answers (without RAG)
-    train_baseline_dataset = await generate_answers(
-        dataset=train_dataset, 
-        llm=llm, 
-        use_rag=False,
-    )
-    test_baseline_dataset = await generate_answers(
-        dataset=test_dataset, 
-        llm=llm, 
-        use_rag=False,
-    )
+    # Run experiments
+    datasets = {
+        "train_baseline": await generate_answers(train_dataset, llm=llm, use_rag=False),
+        "test_baseline": await generate_answers(test_dataset, llm=llm, use_rag=False),
+        "train_rag": await generate_answers(train_dataset, llm=llm, vectorstore=vectorstore, 
+                                         k=args.k, score_threshold=args.score_threshold, use_rag=True),
+        "test_rag": await generate_answers(test_dataset, llm=llm, vectorstore=vectorstore, 
+                                        k=args.k, score_threshold=args.score_threshold, use_rag=True)
+    }
     
-    # Generate RAG Answers
-    train_rag_dataset = await generate_answers(
-        dataset=train_dataset, 
-        llm=llm, 
-        vectorstore=vectorstore, 
-        k=args.k, 
-        score_threshold=args.score_threshold, 
-        use_rag=True,
-    )
-    test_rag_dataset = await generate_answers(
-        dataset=test_dataset, 
-        llm=llm, 
-        vectorstore=vectorstore, 
-        k=args.k, 
-        score_threshold=args.score_threshold, 
-        use_rag=True,
-    )
-    
-    results = {}
-    
-    # Evaluate baseline (no RAG)
-    results["train_baseline"] = await evaluate_dataset(
-        train_baseline_dataset, "Train Baseline (No RAG)"
-    )
-    results["test_baseline"] = await evaluate_dataset(
-        test_baseline_dataset, "Test Baseline (No RAG)"
-    )
-    
-    # Evaluate with RAG
-    results["train_rag"] = await evaluate_dataset(
-        train_rag_dataset, "Train RAG"
-    )
-    results["test_rag"] = await evaluate_dataset(
-        test_rag_dataset, "Test RAG"
-    )
+    # Evaluate all datasets
+    results = {name: await evaluate_dataset(dataset, name) for name, dataset in datasets.items()}
 
-    # Log Results and save to CSV files
+    # Log results
     for name, result in results.items():
         metrics_logger.info(f"RESULTS - {name}: {result}")
     
+    # Create summary dataframe
     summary_data = {}
     for name, result in results.items():
         numeric_df = result.to_pandas().select_dtypes(include=['number'])
-        result_dict_row = numeric_df.iloc[0].to_dict()
-        for metric, score in result_dict_row.items():
+        for metric, score in numeric_df.iloc[0].to_dict().items():
             summary_data.setdefault(metric, {})[name] = score
+    
+    # Save summary in csv file
     summary_df = pd.DataFrame(summary_data)
     summary_path = model_dir / "summary.csv"
     summary_df.to_csv(summary_path) 
     logger.info(f"Summary comparison saved to: {summary_path}")
     metrics_logger.info(f"SUMMARY SAVED: {summary_path}")
 
+    # Log completion
     total_run_time = time.time() - start_run_time
     logger.info(f"Benchmarking finished in {total_run_time:.2f} seconds.")
     metrics_logger.info(f"BENCHMARK COMPLETED - Total runtime: {total_run_time:.2f} seconds")
     metrics_logger.removeHandler(metrics_handler)
     qa_logger.removeHandler(qa_handler)
 
-
 if __name__ == "__main__":
     # Configuration
-    default_embedding_model = "text-embedding-3-small"
-    default_chunk_size = 1024
-    default_split_ratio = 0.8
-    default_llm = "gpt-4o"
-    default_k = 3
-    default_score_threshold = 0.35
-    default_max_test_samples = 100
-    random.seed(0)
-    
-    # Argument parsing
     parser = argparse.ArgumentParser(description="Benchmark RAG system using RAGAS")
-    parser.add_argument("--model", type=str, default=default_embedding_model,
+    parser.add_argument("--model", type=str, default="text-embedding-3-small",
                         choices=["text-embedding-ada-002", "text-embedding-3-small", "text-embedding-3-large"],
                         help="Embedding model used for vector store.")
-    parser.add_argument("--chunk_size", type=int, default=default_chunk_size,
+    parser.add_argument("--chunk_size", type=int, default=1024,
                         help="Chunk size used for vector store.")
-    parser.add_argument("--split_ratio", type=float, default=default_split_ratio,
-                        help="Train/test split ratio used when creating the vector store (to load the correct test set).")
-    parser.add_argument("--llm", type=str, default=default_llm,
-                        help="OpenAI model used to generate answers (e.g., gpt-4o, gpt-3.5-turbo).")
-    parser.add_argument("--k", type=int, default=default_k,
+    parser.add_argument("--split_ratio", type=float, default=0.8,
+                        help="Train/test split ratio.")
+    parser.add_argument("--llm", type=str, default="gpt-4o",
+                        help="OpenAI model used to generate answers.")
+    parser.add_argument("--k", type=int, default=3,
                         help="Number of documents to retrieve.")
-    parser.add_argument("--score_threshold", type=float, default=default_score_threshold,
+    parser.add_argument("--score_threshold", type=float, default=0.35,
                         help="Relevance score threshold for retrieved documents.")
-    parser.add_argument("--max_samples", type=int, default=default_max_test_samples,
-                        help="Maximum number of test samples to run (for quick testing). Set to 0 or negative for all.")
+    parser.add_argument("--max_samples", type=int, default=100,
+                        help="Maximum number of test samples to run. Set to 0 for all.")
 
     args = parser.parse_args()
-
+    random.seed(0)
+    
     # Run the benchmark
     asyncio.run(run_benchmark(args))
