@@ -89,15 +89,15 @@ async def generate_answers(dataset: Dataset, vectorstore: FAISS = None, llm: Cha
             )
             contexts = [doc.page_content for doc, score in retrieved_docs]
         
-        # Prepare prompt based on whether we have contexts
-        system_prompt = template_prompt
+        # Prepare user message with RAG information if available
+        user_message = f"Question: {question}"
         if contexts != []:
             context_str = "\n\n---\n\n".join([f"RAG information {i+1}:\n{ctx}" for i, ctx in enumerate(contexts)])
-            system_prompt += f"\n\nHướng dẫn: Đây là thông tin từ cơ sở dữ liệu y tế Việt Nam. \n{context_str}"
+            user_message = f"Thông tin từ cơ sở dữ liệu y tế Việt Nam:\n{context_str}\n\nQuestion: {question}"
         
         messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Question: {question}"}
+            {"role": "system", "content": template_prompt},
+            {"role": "user", "content": user_message}
         ]
         
         # Generate answer

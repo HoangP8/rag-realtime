@@ -39,6 +39,7 @@ INSTRUCTIONS = """You are a HEALTHCARE ASSISTANT.
         2. If the user speaks in Vietnamese, respond ONLY in Vietnamese.
         3. If the user speaks in English, respond ONLY in English.
         4. Be clear, accessible, and concise in your explanations.
+        5. Start every conversation by saying: 'Hello! Xin chào! Tôi có thể giúp gì cho bạn?'
         """
 GREETING = "Xin chào! Bạn có khỏe không? Hello! How are you?"
 
@@ -83,7 +84,8 @@ def setup_latency_tracking(agent, state):
 
 async def voice_entrypoint(ctx: JobContext):
     # Initialize chat context
-    chat_ctx = llm.ChatContext().append(role="system", text=INSTRUCTIONS)
+    chat_ctx = llm.ChatContext()
+    chat_ctx.append(role="system", text=INSTRUCTIONS)
     
     # Connect to room
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -113,7 +115,6 @@ async def voice_entrypoint(ctx: JobContext):
     
     # Connect and perform warm-up
     agent.start(room=ctx.room, participant=participant)
-    await agent.say(GREETING, allow_interruptions=True)
     await asyncio.sleep(1)
     state["warmup_done"] = True
     logger.info("Warmup completed (fallback after delay)")
@@ -128,16 +129,13 @@ async def multimodal_entrypoint(ctx: JobContext):
     # Real-time model configuration
     model = openai.realtime.RealtimeModel(
         model="gpt-4o-realtime-preview-2024-12-17",
-        instructions=INSTRUCTIONS,
         modalities=["text", "audio"],
         voice="coral",
     )
     
     # Chat context and agent setup
-    chat_ctx = llm.ChatContext().append(
-        text=f"Greetings strictly with this text: `{GREETING}`",
-        role="system",
-    )
+    chat_ctx = llm.ChatContext()
+    chat_ctx.append(role="system", text=INSTRUCTIONS)
     agent = MultimodalAgent(model=model, chat_ctx=chat_ctx)
     
     # State for latency measurement and conversation tracking
@@ -153,7 +151,6 @@ async def multimodal_entrypoint(ctx: JobContext):
     
     # Connect and perform warm-up
     agent.start(room=ctx.room, participant=participant)
-    agent.generate_reply(on_duplicate="cancel_existing")
     await asyncio.sleep(1)
     state["warmup_done"] = True
     logger.info("Warmup completed (fallback after delay)")
