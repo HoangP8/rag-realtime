@@ -68,7 +68,9 @@ RABBITMQ_PASSWORD=your_rabbitmq_password
 
 ### 2. Set up fly.io secrets
 
-Instead of including sensitive information in your deployment, set them as secrets in fly.io:
+Instead of including sensitive information in your deployment, set them as secrets in fly.io.
+
+Secrets can be set after the app is deployed. See next section for a quick start.
 
 ```bash
 # Navigate to the backend-services directory
@@ -119,6 +121,9 @@ cd backend-services
 
 # Launch the app (first-time deployment)
 flyctl launch
+
+# Set the secrets
+cat .env.local | tr '\n' ' ' | xargs flyctl secrets set
 
 # For subsequent deployments
 flyctl deploy

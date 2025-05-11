@@ -21,10 +21,9 @@ from dotenv import load_dotenv
 load_dotenv()
 load_dotenv(".env.local")
 
-# print(f"supabase env keys: {os.getenv('NEXT_PUBLIC_SUPABASE_URL')}, {os.getenv('NEXT_PUBLIC_SUPABASE_ANON_KEY')}")
-
 # Base URL for the API
-BASE_URL = "http://localhost:8000"
+# BASE_URL = "http://localhost:8000"
+BASE_URL = "https://medbot-backend.fly.dev/"
 
 # Authentication token
 TOKEN = None
