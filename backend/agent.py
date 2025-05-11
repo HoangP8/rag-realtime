@@ -4,12 +4,13 @@ import os
 import time
 from dotenv import load_dotenv
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional, Any
+from typing import Annotated, Dict, List, Optional, Any, Protocol
 import asyncio
 import langid
 import json
 
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
+from livekit import rtc
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm, stt
 from livekit.agents.multimodal import MultimodalAgent, AgentTranscriptionOptions
 from livekit.plugins import openai
 from langchain_openai import OpenAIEmbeddings
@@ -43,6 +44,12 @@ def load_vectorstore(model_name: str, chunk_size: int = 1024):
     vectorstore = FAISS.load_local(model_folder, embeddings, allow_dangerous_deserialization=True)
     logger.info(f"Vector store loaded in {time.time() - start_time:.2f}s")
     return vectorstore, embeddings
+
+class _InputTranscriptionProto(Protocol):
+    item_id: str
+    """id of the item"""
+    transcript: str
+    """transcript of the input audio"""
 
 class MedicalFunctionContext(llm.FunctionContext):
     """Function context for RAG capabilities"""
@@ -97,7 +104,7 @@ class MedicalFunctionContext(llm.FunctionContext):
         Instructions: This is information from the Vietnamese medical database.
         Please translate this information and answer the user's question concisely in English.
         """
-        
+
         response = "\n\n---\n\n".join(response_parts) + instructions
         
         # Log metrics and return
@@ -118,6 +125,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
         vad: Optional[Any] = None,
         transcription=AgentTranscriptionOptions(),
         loop: Optional[asyncio.AbstractEventLoop] = None,
+        chat_ctx: llm.ChatContext,
     ):
         # Initialize RAG function context
         self.med_fnc_ctx = MedicalFunctionContext(vectorstore=vectorstore)
@@ -125,7 +133,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
         super().__init__(
             model=model,
             vad=vad,
-            chat_ctx=llm.ChatContext(),
+            chat_ctx=chat_ctx,
             fnc_ctx=self.med_fnc_ctx,
             transcription=transcription,
             loop=loop,
@@ -137,103 +145,31 @@ class MedicalMultimodalAgent(MultimodalAgent):
         self.active_user_id = None
         self.active_chat_id = None
         self.max_history_turns = 5
+        self.instruction_format = """You are a HEALTHCARE ASSISTANT.
+        Your ONLY purpose is to provide healthcare and medical information.
+        You can ONLY work (understand, speak, and answer) in two languages: Vietnamese or English. 
+        Do NOT work on other languages, they are maybe noise from the user that you mistranslate.
+        Be CONCISE and SMOOTH in your responses without hesitation, no need to repeat the same thing over and over again.
+        
+        IMPORTANT RULES:
+        1. ONLY answer healthcare/medical questions. For ANY other topics, politely refuse and remind the user
+           that you are a dedicated healthcare assistant, EVEN they ask about your health or other conditions.
+        2. If the user speaks in Vietnamese, respond ONLY in Vietnamese.
+        3. If the user speaks in English, respond ONLY in English.
+        4. Be clear, accessible, and concise in your explanations.
+        5. Start every conversation by saying: 'Hello! Xin chào! Tôi có thể giúp gì cho bạn?'
+
+        RAG CONTEXT: {RAG_context}
+        """
         
         # Initialize test data and listeners
-        self._initialize_dummy_chat_history()
+    
+    def start(self, room: rtc.Room, participant: rtc.RemoteParticipant | str | None = None):
+        super().start(room, participant)
+        
         self.setup_event_listeners()
-    
-    def _initialize_dummy_chat_history(self):
-        """Initialize dummy chat history for testing"""
-        
-        test_user_id = "user_test_123"
-        test_chat_id = "chat_medical_history"
-        
-        dummy_history = [
-            {"role": "user", "content": "Tôi tên là Hoàng, hãy gọi tên tôi mỗi khi bạn nói chuyện với tôi.", "timestamp": time.time() - 3600},
-            {"role": "assistant", "content": "Xin chào anh Hoàng! Tôi là trợ lý y tế của anh.", "timestamp": time.time() - 3590},
-            {"role": "user", "content": "Tôi vừa được chẩn đoán mắc bệnh tiểu đường 2 tháng trước. Đường huyết của tôi khoảng 180-200 mg/dL.", "timestamp": time.time() - 3580},
-            {"role": "assistant", "content": "Cảm ơn anh Hoàng đã chia sẻ thông tin. Mức đường huyết của anh cao hơn mức mục tiêu.", "timestamp": time.time() - 3570},
-        ]
-        
-        # Initialize the history
-        if test_user_id not in self.conversation_history:
-            self.conversation_history[test_user_id] = {}
-        self.conversation_history[test_user_id][test_chat_id] = dummy_history
-        log_event("SETUP", f"Initialized chat history for test user {test_user_id}")
-    
-    def setup_event_listeners(self):
-        """Configure speech event handlers"""
-        @self.on("user_speech_committed")
-        def on_user_speech_committed(msg):
-            user_id = "user_test_123"
-            chat_id = "chat_medical_history"
-            
-            self.active_user_id = user_id
-            self.active_chat_id = chat_id
-            
-            # Get or create chat history and record speech
-            chat_history, _ = self.load_chat_history(user_id, chat_id)
-            chat_history.append({"role": "user", "content": msg, "timestamp": time.time()})
-            
-            log_event("USER TALK", f"User ID: {user_id}, Chat ID: {chat_id}, Message: {msg}")
-            asyncio.create_task(self.process_committed_transcript(msg, user_id, chat_id))
-        
-        @self.on("agent_speech_committed")
-        def on_agent_speech_committed(speech_data):
-            """Capture agent's speech responses"""
-            if not self.active_user_id or not self.active_chat_id:
-                logger.warning("Agent speech committed but no active user/chat")
-                return
-                
-            # Get chat history and add response
-            chat_history, _ = self.load_chat_history(
-                self.active_user_id, self.active_chat_id
-            )
-            chat_history.append({
-                "role": "assistant", 
-                "content": speech_data, 
-                "timestamp": time.time()
-            })
-            log_event("AI RESPONSE", f"User ID: {self.active_user_id}, Chat ID: {self.active_chat_id}, Response: {speech_data}")
 
-    def load_chat_history(self, user_id, chat_id=None):
-        """Get or create chat history for a user and specific chat"""
-        if user_id not in self.conversation_history:
-            self.conversation_history[user_id] = {}
-        
-        # If no chat_id provided, create a new one
-        if not chat_id:
-            chat_id = f"chat_{int(time.time())}"
-            self.conversation_history[user_id][chat_id] = []
-        elif chat_id not in self.conversation_history[user_id]:
-            self.conversation_history[user_id][chat_id] = []
-            
-        return self.conversation_history[user_id][chat_id], chat_id
-
-    def format_chat_history(self, chat_history, max_turns=5):
-        """Format chat history to include in the prompt"""
-        history_to_format = chat_history.copy()
-        if history_to_format and history_to_format[-1]["role"] == "user":
-            history_to_format = history_to_format[:-1]
-        
-        # Only keep the last N turns of chat history
-        recent_history = history_to_format[-max_turns*2:] if len(history_to_format) > max_turns*2 else history_to_format
-        
-        formatted_lines = []
-        for entry in recent_history:
-            role = "User" if entry["role"] == "user" else "Assistant"
-            formatted_lines.append(f"{role}: {entry['content']}")
-        
-        return "\n".join(formatted_lines)
-    
-    def detect_language(self, text):
-        """Detect language of the text"""
-        lang, _ = langid.classify(text)
-        return "vi" if lang == 'vi' else "en"
-    
-    async def process_committed_transcript(self, msg, user_id, chat_id):
-        """Apply RAG to user's utterance and update conversation context"""
-        # Skip processing for empty messages
+    async def add_rag_to_query(self, msg):
         if not msg or msg.strip() == "":
             log_event("PROCESS", "Skipping empty message")
             return
@@ -241,48 +177,54 @@ class MedicalMultimodalAgent(MultimodalAgent):
         # Detect language
         self.current_language = self.detect_language(msg)
         log_event("PROCESS", f"Query: {msg}, Language: {self.current_language}")
-        
-        # Perform RAG search
-        result = ""
-        if len(msg.split()) > 5:
-            result = await self.med_fnc_ctx.rag_search(query=msg, language=self.current_language)
-        
-        # Get chat history
-        chat_history, _ = self.load_chat_history(user_id, chat_id)    
-        formatted_history = self.format_chat_history(chat_history, self.max_history_turns)
-        
-        # Add RAG results and chat history to conversation context
-        if hasattr(self._model, 'sessions') and self._model.sessions:
-            session = self._model.sessions[0]
-            prompt_parts = []
-            
-            # Add conversation history if it exists
-            if formatted_history:
-                prompt_parts.append(f"CONVERSATION HISTORY:\n{formatted_history}")
-            
-            # Add RAG context if available
-            if result and len(result.strip()) > 0:
-                prompt_parts.append(f"RAG MEDICAL CONTEXT:\n{result}")
-            
-            # Add current query
-            prompt_parts.append(f"CURRENT USER QUERY:\n{msg}")
-            
-            # Finalize the prompt
-            combined_query = "\n\n".join(prompt_parts)
-            
-            # Update the session
-            session.conversation.item.create(
-                llm.ChatMessage(role="user", content=combined_query)
-            )
-            log_event("PROMPT", "Combined query with history and RAG sent to model")
-        
-        log_event("HISTORY", f"Active chat history has {len(chat_history)} messages")
-        
-    async def on_transcript(self, transcript, participant_identity=None):
-        """Process user speech transcript"""
-        if hasattr(self._model, 'on_transcript'):
-            await self._model.on_transcript(transcript, participant_identity)
 
+        # get RAG
+        result = await self.med_fnc_ctx.rag_search(query=msg, language=self.current_language)
+
+        new_instruction = self.instruction_format.format(RAG_context=result)
+
+        self._session.session_update(instructions=new_instruction)
+        
+        log_event("FINAL1", "instruction + rag:")
+        log_event("-", new_instruction)
+        log_event("FINAL2", "message:")
+        for index, messages in enumerate(self._session.chat_ctx_copy()):
+            log_event(index, messages)
+
+    def setup_event_listeners(self):
+        """Configure speech event handlers"""
+        @self._session.on("input_speech_transcription_completed")
+        def _input_speech_transcription_completed(ev: _InputTranscriptionProto):
+            # Modify RAG in instruction
+            asyncio.create_task(self.add_rag_to_query(ev.transcript))
+    
+    def detect_language(self, text):
+        """Detect language of the text"""
+        lang, _ = langid.classify(text)
+        return "vi" if lang == 'vi' else "en"
+
+def get_user_active_chat_history(user_id = "user_test_123"):
+    """Initialize dummy chat history for testing"""
+    
+    if user_id != "user_test_123":
+        return None
+    
+    dummy_history = [
+        {"role": "user", "content": "Tôi tên là Hoàng, hãy gọi tên tôi mỗi khi bạn nói chuyện với tôi."},
+        {"role": "assistant", "content": "Xin chào anh Hoàng! Tôi là trợ lý y tế của anh."},
+        {"role": "user", "content": "Tôi vừa được chẩn đoán mắc bệnh tiểu đường 2 tháng trước. Đường huyết của tôi khoảng 180-200 mg/dL."},
+        {"role": "assistant", "content": "Cảm ơn anh Hoàng đã chia sẻ thông tin. Mức đường huyết của anh cao hơn mức mục tiêu."},
+    ]
+    
+    messages = [
+        llm.ChatMessage(
+            role=item["role"],
+            content=item["content"]
+        )
+        for item in dummy_history
+    ]
+
+    return llm.ChatContext(messages=messages)
 
 async def entrypoint(ctx: JobContext):
     """Main entry point for the medical assistant"""
@@ -290,7 +232,7 @@ async def entrypoint(ctx: JobContext):
     # Initialize connection
     start_time = time.time()
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    await ctx.wait_for_participant()
+    participant = await ctx.wait_for_participant()
     log_event("STARTUP", f"Connection established in {time.time() - start_time:.2f}s")
     
     # Load vectorstore
@@ -320,20 +262,22 @@ async def entrypoint(ctx: JobContext):
             threshold=0.5, prefix_padding_ms=200, silence_duration_ms=1000
         ),
     )
-    
+
+    chat_ctx = get_user_active_chat_history()
+
     # Initialize the assistant
-    assistant = MedicalMultimodalAgent(model=model, vectorstore=vectorstore)
-    assistant.start(ctx.room)
-    ctx.assistant = assistant
+    assistant = MedicalMultimodalAgent(model=model, chat_ctx=chat_ctx, vectorstore=vectorstore)
+    assistant.start(ctx.room, participant)
     log_event("STARTUP", "Assistant started")
     
     # Warm-up RAG system
     await assistant.med_fnc_ctx.rag_search(query="How are you today?", language="en")
     log_event("WARMUP", "RAG system warmed up")
         
-    # Initial greeting
-    session = model.sessions[0]
-    session.response.create()
+    # Initial greeting if new chat
+    if (chat_ctx == None):
+        assistant.generate_reply()
+
     logger.info("Assistant initialized and ready")
 
 if __name__ == "__main__":  
