@@ -58,6 +58,31 @@ async def store_transcription(
         logger.error(f"Error storing transcription: {str(e)}")
         # Don't raise the exception to avoid interrupting the conversation flow
 
+async def send_transcription(
+    ctx: JobContext,
+    participant: rtc.Participant,
+    track_sid: str,
+    segment_id: str,
+    text: str,
+    is_final: bool = True,
+):
+    """Send transcription to the room"""
+    transcription = rtc.Transcription(
+        participant_identity=participant.identity,
+        track_sid=track_sid,
+        segments=[
+            rtc.TranscriptionSegment(
+                id=segment_id,
+                text=text,
+                start_time=0,
+                end_time=0,
+                language="en",
+                final=is_final,
+            )
+        ],
+    )
+    await ctx.room.local_participant.publish_transcription(transcription)
+
 async def entrypoint(ctx: JobContext):
     """
     Entrypoint for the LiveKit Agents worker
@@ -229,31 +254,6 @@ async def entrypoint(ctx: JobContext):
             else:
                 logger.error("Max retries reached, giving up")
                 raise
-
-async def send_transcription(
-    ctx: JobContext,
-    participant: rtc.Participant,
-    track_sid: str,
-    segment_id: str,
-    text: str,
-    is_final: bool = True,
-):
-    """Send transcription to the room"""
-    transcription = rtc.Transcription(
-        participant_identity=participant.identity,
-        track_sid=track_sid,
-        segments=[
-            rtc.TranscriptionSegment(
-                id=segment_id,
-                text=text,
-                start_time=0,
-                end_time=0,
-                language="en",
-                final=is_final,
-            )
-        ],
-    )
-    await ctx.room.local_participant.publish_transcription(transcription)
 
 if __name__ == "__main__":
     # Configure logging

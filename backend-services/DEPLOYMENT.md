@@ -30,8 +30,8 @@ For cost efficiency during the trial phase, all microservices are deployed to a 
 - **Auth Service** (Port 8001): Handles authentication and user management
 - **Conversation Service** (Port 8002): Manages conversations and LLM interactions
 - **Voice Service** (Port 8003): Handles real-time voice communication
-- **Voice API**: Manages voice sessions and client connections
-- **LiveKit Agent Worker**: Handles real-time speech-to-speech functionality
+   - Voice API: Manages voice sessions and client connections
+   - LiveKit Agent Worker: Handles real-time speech-to-speech functionality
 
 The services communicate with each other via localhost, eliminating the need for complex networking.
 
