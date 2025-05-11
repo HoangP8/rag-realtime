@@ -62,8 +62,9 @@ class UserProfileUpdate(UserProfileBase):
 class UserProfileResponse(UserProfileBase):
     """User profile response model"""
     id: UUID
-    email: EmailStr
-    created_at: datetime
+    email: Optional[EmailStr] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         """Pydantic config"""
@@ -83,8 +84,9 @@ class UserPreferencesUpdate(UserPreferencesBase):
 class UserPreferencesResponse(UserPreferencesBase):
     """User preferences response model"""
     id: UUID
-    user_id: UUID
+    user_id: Optional[UUID] = None
     updated_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         """Pydantic config"""

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.schemas.profile import UserProfileResponse, UserProfileUpdate, UserPreferencesResponse, UserPreferencesUpdate
 from app.services.profile import ProfileService
-from app.core.dependencies import get_profile_service, get_current_user
+from app.core.dependencies import get_profile_service, get_current_user_and_token
 
 router = APIRouter()
 
@@ -15,11 +15,13 @@ router = APIRouter()
 @router.get("/", response_model=UserProfileResponse)
 async def get_profile(
     profile_service: ProfileService = Depends(get_profile_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Get user profile"""
     try:
-        profile = await profile_service.get_user_profile(user_id)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        profile = await profile_service.get_user_profile(user_id, token)
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -39,11 +41,13 @@ async def get_profile(
 async def update_profile(
     profile_data: UserProfileUpdate,
     profile_service: ProfileService = Depends(get_profile_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Update user profile"""
     try:
-        profile = await profile_service.update_user_profile(user_id, profile_data)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        profile = await profile_service.update_user_profile(user_id, profile_data, token)
         return profile
     except Exception as e:
         raise HTTPException(
@@ -55,11 +59,13 @@ async def update_profile(
 @router.get("/preferences", response_model=UserPreferencesResponse)
 async def get_preferences(
     profile_service: ProfileService = Depends(get_profile_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Get user preferences"""
     try:
-        preferences = await profile_service.get_user_preferences(user_id)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        preferences = await profile_service.get_user_preferences(user_id, token)
         return preferences
     except Exception as e:
         raise HTTPException(
@@ -72,11 +78,13 @@ async def get_preferences(
 async def update_preferences(
     preferences_data: UserPreferencesUpdate,
     profile_service: ProfileService = Depends(get_profile_service),
-    user_id: UUID = Depends(get_current_user)
+    user_data = Depends(get_current_user_and_token)
 ):
     """Update user preferences"""
     try:
-        preferences = await profile_service.update_user_preferences(user_id, preferences_data)
+        user_id = user_data["user_id"]
+        token = user_data["token"]
+        preferences = await profile_service.update_user_preferences(user_id, preferences_data, token)
         return preferences
     except Exception as e:
         raise HTTPException(

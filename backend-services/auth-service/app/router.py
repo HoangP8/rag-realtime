@@ -60,54 +60,55 @@ async def logout(auth_service: AuthService = Depends(get_auth_service)):
     return {"message": "Successfully logged out"}
 
 
-# @router.get("/validate")
-# async def validate_token(token: str = None, authorization: str = Header(None), auth_service: AuthService = Depends(get_auth_service)):
-#     """Validate a token"""
-#     try:
-#         extracted_token = None
+@router.get("/validate")
+async def validate_token(token: str = None, authorization: str = Header(None), auth_service: AuthService = Depends(get_auth_service)):
+    """Validate a token"""
+    try:
+        extracted_token = None
         
-#         # Try to get token from query parameter
-#         if token:
-#             logger.info("Using token from query parameter")
-#             extracted_token = token
-#         # Try to get token from Authorization header
-#         elif authorization:
-#             if authorization.startswith("Bearer "):
-#                 logger.info("Extracting token from Bearer authorization header")
-#                 extracted_token = authorization.replace("Bearer ", "").strip()
-#             else:
-#                 logger.warning(f"Authorization header does not start with 'Bearer ': {authorization[:15]}...")
-#                 extracted_token = authorization.strip()
-#                 logger.info("Using raw authorization header as token")
-#         else:
-#             raise HTTPException(
-#                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-#                 detail="Token is required either as a query parameter or in the Authorization header"
-#             )
+        # Try to get token from query parameter
+        if token:
+            logger.info("Using token from query parameter")
+            extracted_token = token
+        # Try to get token from Authorization header
+        elif authorization:
+            if authorization.startswith("Bearer "):
+                logger.info("Extracting token from Bearer authorization header")
+                extracted_token = authorization.replace("Bearer ", "").strip()
+            else:
+                logger.warning(f"Authorization header does not start with 'Bearer ': {authorization[:15]}...")
+                extracted_token = authorization.strip()
+                logger.info("Using raw authorization header as token")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Token is required either as a query parameter or in the Authorization header"
+            )
         
-#         # Log token format for debugging (showing only first few characters for security)
-#         if extracted_token:
-#             token_preview = extracted_token[:10] + "..." if len(extracted_token) > 10 else extracted_token
-#             segments = extracted_token.split(".")
-#             logger.info(f"Token preview: {token_preview}, segments: {len(segments)}")
+        # Log token format for debugging (showing only first few characters for security)
+        # if extracted_token:
+        #     token_preview = extracted_token[:10] + "..." if len(extracted_token) > 10 else extracted_token
+        #     segments = extracted_token.split(".")
+        #     logger.info(f"Token preview: {token_preview}, segments: {len(segments)}")
         
-#         # Validate token
-#         user_id = await auth_service.validate_token(extracted_token)
-#         return {"user_id": user_id, "valid": True}
-#     except ValueError as e:
-#         # Handle specific validation errors
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail=str(e)
-#         )
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         logger.error(f"Token validation failed: {str(e)}")
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail=f"Invalid token: {str(e)}"
-#         )
+        # Validate token
+        user_id = await auth_service.validate_token(extracted_token)
+        return {"user_id": user_id, "valid": True}
+    except ValueError as e:
+        # Handle specific validation errors
+        logger.error(f"Token validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Token validation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}"
+        )
 
 
 async def _get_user_id_from_auth(authorization: str, auth_service: AuthService) -> UUID:

@@ -28,8 +28,6 @@ async def get_conversations(
     try:
         user_id = user_data["user_id"]
         token = user_data["token"]
-        # print(f"User ID: {user_id}")
-        # print(f"Token: {token}")
         conversations = await conversation_service.get_user_conversations(user_id, token)
         return conversations
     except Exception as e:
@@ -49,8 +47,6 @@ async def create_conversation(
     try:
         user_id = user_data["user_id"]
         token = user_data["token"]
-        # print(f"User ID: {user_id}")
-        # print(f"Token: {token}")
         conversation = await conversation_service.create_conversation(user_id, conversation_data, token)
         return conversation
     except Exception as e:

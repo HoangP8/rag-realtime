@@ -92,28 +92,33 @@ class AuthService:
     async def validate_token(self, token: str) -> UUID:
         """Validate token and return user ID"""
         try:
-            # Basic validation for token format
-            if not token or not isinstance(token, str):
-                self.logger.error("Token is empty or not a string")
-                raise ValueError("Invalid token format: Token is empty or not a string")
+            # Try to get user data from Supabase
+            try:
+                user = self.supabase.auth.get_user(token)
                 
-            # Check if token has the correct JWT format (3 parts separated by dots)
-            parts = token.split('.')
-            if len(parts) != 3:
-                self.logger.error(f"Token has invalid number of segments: {len(parts)}")
-                raise ValueError(f"Invalid token format: Token has {len(parts)} segments, expected 3")
+                # Return user ID
+                return UUID(user.user.id)
+            except Exception as supabase_error:
+                # Log the specific Supabase error
+                self.logger.error(f"Supabase error when validating token: {str(supabase_error)}")
+                
+                # Check for common error patterns
+                error_str = str(supabase_error)
+                if "Not Found" in error_str:
+                    raise ValueError("Token is not associated with any user or has expired")
+                elif "invalid JWT" in error_str:
+                    raise ValueError("Invalid JWT format or signature")
+                elif "JWT expired" in error_str or "expired" in error_str.lower():
+                    raise ValueError("Token has expired")
+                else:
+                    # Re-raise with more context
+                    raise ValueError(f"Token validation failed: {error_str}")
             
-            # Get user data from Supabase
-            user = self.supabase.auth.get_user(token)
-            
-            # Return user ID
-            return UUID(user.user.id)
-        
         except ValueError as e:
             self.logger.error(f"Token validation error: {str(e)}")
             raise
         except Exception as e:
-            self.logger.error(f"Error validating token: {str(e)}")
+            self.logger.error(f"Unexpected error validating token: {str(e)}")
             raise
 
     async def get_user_profile(self, user_id: UUID) -> Optional[UserProfileResponse]:
@@ -127,9 +132,14 @@ class AuthService:
             
             profile_data = response.data[0]
             
-            # Get user email from auth
-            auth_user = self.supabase.auth.admin.get_user_by_id(str(user_id))
-            email = auth_user.user.email
+            # Get user email from auth - using try/except to handle permission issues
+            email = None
+            try:
+                auth_user = self.supabase.auth.admin.get_user_by_id(str(user_id))
+                email = auth_user.user.email
+            except Exception as auth_error:
+                self.logger.warning(f"Could not get user auth details: {str(auth_error)}")
+                # Fall back to just using profile data without email
             
             # Return profile data
             return UserProfileResponse(
@@ -138,7 +148,8 @@ class AuthService:
                 first_name=profile_data.get("first_name"),
                 last_name=profile_data.get("last_name"),
                 date_of_birth=profile_data.get("date_of_birth"),
-                created_at=auth_user.user.created_at
+                created_at=profile_data.get("created_at"),
+                updated_at=profile_data.get("updated_at")
             )
             
         except Exception as e:
@@ -188,6 +199,7 @@ class AuthService:
                 id=UUID(profile_data["id"]),
                 user_id=user_id,
                 preferences=profile_data.get("preferences", {}),
+                created_at=profile_data.get("created_at"),
                 updated_at=datetime.now()  # This would ideally come from the database
             )
             
@@ -207,8 +219,8 @@ class AuthService:
                 raise HTTPException(status_code=404, detail="User preferences not found")
             
             # Merge existing preferences with new ones
-            current_prefs = current_prefs_response.data[0].get("preferences", {})
-            updated_prefs = {**current_prefs, **data.preferences}
+            current_prefs = current_prefs_response.data[0]
+            updated_prefs = {**current_prefs.get("preferences", {}), **data.preferences}
             
             # Update preferences in the database
             response = self.supabase.table("user_profiles").update({"preferences": updated_prefs}).eq("id", str(user_id)).execute()
@@ -221,6 +233,7 @@ class AuthService:
                 id=UUID(response.data[0]["id"]),
                 user_id=user_id,
                 preferences=updated_prefs,
+                created_at=response.data[0].get("created_at"),
                 updated_at=datetime.now()  # This would ideally come from the database
             )
             

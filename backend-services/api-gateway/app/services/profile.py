@@ -30,11 +30,11 @@ class ProfileService:
         if not self.auth_service_url:
             self.auth_service_url = "http://localhost:8001"
 
-    async def get_user_profile(self, user_id: UUID) -> Optional[UserProfileResponse]:
+    async def get_user_profile(self, user_id: UUID, token: str) -> Optional[UserProfileResponse]:
         """Get user profile"""
         try:
             # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call auth service API
             async with httpx.AsyncClient() as client:
@@ -61,11 +61,11 @@ class ProfileService:
             self.logger.error(f"Error getting user profile: {str(e)}")
             raise
 
-    async def update_user_profile(self, user_id: UUID, data: UserProfileUpdate) -> UserProfileResponse:
+    async def update_user_profile(self, user_id: UUID, data: UserProfileUpdate, token: str) -> UserProfileResponse:
         """Update user profile"""
         try:
             # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Prepare update data
             update_data = {}
@@ -99,11 +99,11 @@ class ProfileService:
             self.logger.error(f"Error updating user profile: {str(e)}")
             raise
 
-    async def get_user_preferences(self, user_id: UUID) -> UserPreferencesResponse:
+    async def get_user_preferences(self, user_id: UUID, token: str) -> UserPreferencesResponse:
         """Get user preferences"""
         try:
             # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call auth service API
             async with httpx.AsyncClient() as client:
@@ -133,12 +133,12 @@ class ProfileService:
             raise
 
     async def update_user_preferences(
-        self, user_id: UUID, data: UserPreferencesUpdate
+        self, user_id: UUID, data: UserPreferencesUpdate, token: str
     ) -> UserPreferencesResponse:
         """Update user preferences"""
         try:
             # Set authorization header with user ID
-            headers = {"Authorization": f"Bearer {str(user_id)}"}
+            headers = {"Authorization": f"Bearer {token}"}
 
             # Call auth service API
             async with httpx.AsyncClient() as client:
