@@ -184,11 +184,12 @@ class MedicalMultimodalAgent(MultimodalAgent):
         new_instruction = self.instruction_format.format(RAG_context=result)
 
         self._session.session_update(instructions=new_instruction)
-        
+        self.generate_reply()
+
         log_event("FINAL1", "instruction + rag:")
         log_event("-", new_instruction)
         log_event("FINAL2", "message:")
-        for index, messages in enumerate(self._session.chat_ctx_copy()):
+        for index, messages in enumerate(self._session.chat_ctx_copy().messages):
             log_event(index, messages)
 
     def setup_event_listeners(self):
@@ -259,7 +260,7 @@ async def entrypoint(ctx: JobContext):
         temperature=0.6,
         modalities=["audio", "text"],
         turn_detection=openai.realtime.ServerVadOptions(
-            threshold=0.5, prefix_padding_ms=200, silence_duration_ms=1000
+            threshold=0.5, prefix_padding_ms=200, silence_duration_ms=1000, create_response=False
         ),
     )
 
