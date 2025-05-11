@@ -4,6 +4,7 @@ Storage service for database operations
 import logging
 from typing import Dict, Any, Optional, List
 from uuid import UUID
+from datetime import datetime
 
 from supabase import create_client, Client
 
@@ -36,14 +37,34 @@ class StorageService:
     def get_user(self, token: str):
         return self.client.auth.get_user(token)
     
+    def _serialize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert Python objects to JSON-serializable types"""
+        serialized = {}
+        for key, value in data.items():
+            if isinstance(value, UUID):
+                serialized[key] = str(value)
+            elif isinstance(value, datetime):
+                serialized[key] = value.isoformat()
+            elif isinstance(value, dict):
+                serialized[key] = self._serialize_data(value)
+            elif isinstance(value, list):
+                serialized[key] = [
+                    self._serialize_data(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+            else:
+                serialized[key] = value
+        return serialized
+    
     async def create_session(self, session: VoiceSession, auth_token: str) -> Dict[str, Any]:
         """Create a voice session in the database"""
         try:
             # Set auth token
             self.set_auth_token(auth_token)
             
-            # Convert session to dict
+            # Convert session to dict and serialize
             session_data = session.model_dump()
+            session_data = self._serialize_data(session_data)
             
             # Insert session into database
             response = self.client.table("voice_sessions").insert(session_data).execute()
@@ -101,8 +122,9 @@ class StorageService:
             # Set auth token
             self.set_auth_token(auth_token)
             
-            # Convert message to dict
+            # Convert message to dict and serialize
             message_data = message.model_dump()
+            message_data = self._serialize_data(message_data)
             
             # Insert message into database
             response = self.client.table("messages").insert(message_data).execute()

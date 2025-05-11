@@ -5,21 +5,58 @@ import json
 import logging
 import asyncio
 import uuid
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from uuid import UUID
 
 from livekit import rtc
-from livekit.agents import AgentSession, JobContext, WorkerOptions, WorkerType, AutoSubscribe, cli
+from livekit.agents import JobContext, WorkerOptions, WorkerType, AutoSubscribe, cli
 from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 
 from app.config import settings
-from agent.agent import VoiceAgent
+from app.models import TranscriptionMessage
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds
+
+async def store_transcription(
+    conversation_id: UUID,
+    session_id: str,
+    text: str,
+    role: str,
+    auth_token: Optional[str] = None
+):
+    """Store transcription in conversation database"""
+    try:
+        # Check if we have auth token
+        if not auth_token:
+            logger.warning(f"No auth token available for session {session_id}, skipping transcription storage")
+            return
+            
+        # Import here to avoid circular imports
+        from app.services.storage import StorageService
+        
+        # Create message
+        message = TranscriptionMessage(
+            conversation_id=conversation_id,
+            session_id=session_id,
+            role=role,
+            content=text,
+            message_type="voice",
+            metadata={"source": "voice_session", "session_id": session_id}
+        )
+        
+        # Store message
+        storage = StorageService()
+        await storage.store_transcription(message, auth_token)
+        
+        logger.info(f"Stored transcription in conversation {conversation_id}")
+    
+    except Exception as e:
+        logger.error(f"Error storing transcription: {str(e)}")
+        # Don't raise the exception to avoid interrupting the conversation flow
 
 async def entrypoint(ctx: JobContext):
     """
@@ -44,11 +81,23 @@ async def entrypoint(ctx: JobContext):
             conversation_id_str = metadata.get("conversation_id")
             instructions = metadata.get("instructions")
             voice_settings = metadata.get("voice_settings", {})
+            agent_metadata = metadata.get("metadata", {})
             
             # Validate required fields
             if not session_id or not user_id_str:
                 logger.error("Missing required metadata: session_id or user_id")
                 return
+            
+            # Get auth token from metadata if available
+            auth_token = agent_metadata.get("auth_token")
+            
+            # Convert IDs to proper types
+            user_id = UUID(user_id_str)
+            conversation_id = UUID(conversation_id_str) if conversation_id_str else None
+            
+            # Get instructions or use default
+            if not instructions:
+                instructions = "You are a medical assistant. Help the user with their medical questions."
             
             # Connect to the room with auto-subscribe for audio
             await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -56,19 +105,10 @@ async def entrypoint(ctx: JobContext):
             # Wait for participant to join
             participant = await ctx.wait_for_participant()
             
-            # Create the agent
-            agent = VoiceAgent(
-                session_id=session_id,
-                user_id=UUID(user_id_str),
-                conversation_id=UUID(conversation_id_str) if conversation_id_str else None,
-                instructions=instructions,
-                metadata=metadata.get("metadata", {})
-            )
-            
             # Configure real-time model
             model = openai.realtime.RealtimeModel(
                 api_key=settings.OPENAI_API_KEY,
-                instructions=agent.instructions,
+                instructions=instructions,
                 voice=voice_settings.get("voice_id", settings.DEFAULT_VOICE_ID),
                 temperature=float(voice_settings.get("temperature", settings.DEFAULT_TEMPERATURE)),
                 max_response_output_tokens=int(voice_settings.get("max_output_tokens", settings.DEFAULT_MAX_OUTPUT_TOKENS)),
@@ -151,20 +191,32 @@ async def entrypoint(ctx: JobContext):
                     last_transcript_id = None
                     
                     # Store user message in database
-                    if agent.conversation_id and event.text:
-                        asyncio.create_task(agent.store_transcription(event.text, "user"))
+                    if conversation_id and event.text:
+                        asyncio.create_task(store_transcription(
+                            conversation_id=conversation_id,
+                            session_id=session_id,
+                            text=event.text,
+                            role="user",
+                            auth_token=auth_token
+                        ))
             
             @session.on("response_done")
             def on_response_done(response):
                 # Store assistant response in database
-                if agent.conversation_id and response.text:
-                    asyncio.create_task(agent.store_transcription(response.text, "assistant"))
+                if conversation_id and response.text:
+                    asyncio.create_task(store_transcription(
+                        conversation_id=conversation_id,
+                        session_id=session_id,
+                        text=response.text,
+                        role="assistant",
+                        auth_token=auth_token
+                    ))
             
             # Wait for the session to end (when the room is disconnected)
             await ctx.wait_until_done()
             
             # If we get here, the session ended normally
-            await agent.on_exit()
+            logger.info(f"Agent session {session_id} ended")
             break
             
         except Exception as e:

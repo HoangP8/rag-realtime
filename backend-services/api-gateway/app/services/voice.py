@@ -29,7 +29,7 @@ class VoiceService:
     async def create_session(self, user_id: UUID, data: VoiceSessionCreate, token: str) -> VoiceSessionResponse:
         """Create a new voice session"""
         try:
-            # Prepare request data
+            # Prepare request data with all required fields
             request_data = {
                 "conversation_id": str(data.conversation_id) if data.conversation_id else None,
                 "metadata": data.metadata or {}
@@ -41,7 +41,7 @@ class VoiceService:
             # Call voice service API
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.voice_service_url}/api/v1/session/create",
+                    f"{self.voice_service_url}/api/v1/voice/session/create",
                     json=request_data,
                     headers=headers
                 )
@@ -61,7 +61,6 @@ class VoiceService:
                     conversation_id=UUID(session_data["conversation_id"]) if session_data["conversation_id"] else None,
                     status=session_data["status"],
                     token=session_data["token"],
-                    assistant_token=session_data.get("assistant_token"),  # Include assistant token if available
                     metadata=session_data["metadata"],
                     created_at=session_data["created_at"],
                     config=VoiceSessionConfig(**session_data["config"])
@@ -80,7 +79,7 @@ class VoiceService:
             # Call voice service API
             async with httpx.AsyncClient() as client:
                 response = await client.delete(
-                    f"{self.voice_service_url}/api/v1/session/{session_id}",
+                    f"{self.voice_service_url}/api/v1/voice/session/{session_id}",
                     headers=headers
                 )
 
@@ -107,7 +106,7 @@ class VoiceService:
             # Call voice service API
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.voice_service_url}/api/v1/session/{session_id}/status",
+                    f"{self.voice_service_url}/api/v1/voice/session/{session_id}",
                     headers=headers
                 )
 
@@ -130,9 +129,9 @@ class VoiceService:
                     status=session_data["status"],
                     token=session_data["token"],
                     assistant_token=session_data.get("assistant_token"),  # Include assistant token if available
-                    metadata=session_data["metadata"],
+                    metadata=session_data.get("metadata", {}),
                     created_at=session_data["created_at"],
-                    config=VoiceSessionConfig(**session_data["config"])
+                    config=VoiceSessionConfig(**session_data["config"]) if session_data["config"] else None
                 )
 
         except Exception as e:
@@ -150,7 +149,7 @@ class VoiceService:
             # Call voice service API
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.voice_service_url}/api/v1/session/{session_id}/config",
+                    f"{self.voice_service_url}/api/v1/voice/session/{session_id}/config",
                     json=config.model_dump(),
                     headers=headers
                 )

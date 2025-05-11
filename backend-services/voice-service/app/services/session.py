@@ -36,6 +36,16 @@ class SessionService:
     ) -> VoiceSession:
         """Create a new voice session"""
         try:
+            if not instructions:
+                instructions = "You are a medical assistant. Help the user with their medical questions."
+            # Use default voice settings if not provided
+            if not voice_settings:
+                voice_settings = VoiceSettings(
+                    voice_id=settings.DEFAULT_VOICE_ID,
+                    temperature=settings.DEFAULT_TEMPERATURE,
+                    max_output_tokens=settings.DEFAULT_MAX_OUTPUT_TOKENS
+                )
+
             # Create LiveKit session
             livekit_data = await create_session(
                 user_id=user_id,
@@ -48,14 +58,11 @@ class SessionService:
                     "metadata": metadata or {}
                 }
             )
-            
-            # Use default voice settings if not provided
-            if not voice_settings:
-                voice_settings = VoiceSettings(
-                    voice_id=settings.DEFAULT_VOICE_ID,
-                    temperature=settings.DEFAULT_TEMPERATURE,
-                    max_output_tokens=settings.DEFAULT_MAX_OUTPUT_TOKENS
-                )
+
+            config = {
+                "instructions": instructions,
+                "voice_settings": voice_settings.model_dump() if voice_settings else None,
+            }
             
             # Create session object
             session = VoiceSession(
@@ -65,8 +72,7 @@ class SessionService:
                 room_name=livekit_data["room_name"],
                 token=livekit_data["token"],
                 status="active",
-                instructions=instructions,
-                voice_settings=voice_settings,
+                config=config,
                 metadata=metadata,
                 created_at=datetime.now()
             )
@@ -120,12 +126,9 @@ class SessionService:
             # Get session from cache first
             session = self.session_cache.get(session_id)
             
-            # If not in cache, try to get from database first
-            # If found in database, use its room name
-            # Otherwise fall back to default room name
+            # If not in cache, use default room name
             if not session:
-                session = await self.storage_service.get_session(session_id)
-                room_name = session.room_name if session else f"voice-{session_id}"
+                room_name = f"voice-{session_id}"
             else:
                 room_name = session.room_name
             

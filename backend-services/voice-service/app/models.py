@@ -28,8 +28,7 @@ class VoiceSession(BaseModel):
     room_name: str
     token: str
     status: str = "active"
-    instructions: Optional[str] = None
-    voice_settings: VoiceSettings
+    config: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=datetime.now)
     
@@ -41,7 +40,7 @@ class VoiceSessionResponse(BaseModel):
     status: str
     token: str
     room_name: str
-    voice_settings: VoiceSettings
+    config: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
     created_at: datetime
 

@@ -39,7 +39,7 @@ class ProfileService:
             # Call auth service API
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.auth_service_url}/api/v1/profile",
+                    f"{self.auth_service_url}/api/v1/auth/profile",
                     headers=headers
                 )
 
@@ -79,7 +79,7 @@ class ProfileService:
             # Call auth service API
             async with httpx.AsyncClient() as client:
                 response = await client.patch(
-                    f"{self.auth_service_url}/api/v1/profile",
+                    f"{self.auth_service_url}/api/v1/auth/profile",
                     json=update_data,
                     headers=headers
                 )
@@ -108,7 +108,7 @@ class ProfileService:
             # Call auth service API
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.auth_service_url}/api/v1/profile/preferences",
+                    f"{self.auth_service_url}/api/v1/auth/profile/preferences",
                     headers=headers
                 )
 
@@ -143,7 +143,7 @@ class ProfileService:
             # Call auth service API
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.auth_service_url}/api/v1/profile/preferences",
+                    f"{self.auth_service_url}/api/v1/auth/profile/preferences",
                     json=data.dict(),
                     headers=headers
                 )

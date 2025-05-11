@@ -346,7 +346,13 @@ To obtain a token, use the login endpoint. The token will be valid for a limited
 {
   "conversation_id": "123e4567-e89b-12d3-a456-426614174001",
   "metadata": {
-    "instructions": "You are a helpful medical assistant."
+    // Optional metadata
+    "instructions": "You are a helpful medical assistant.",
+    "voice_settings": {
+      "voice_id": "alloy",
+      "temperature": 0.8,
+      "max_output_tokens": 2048
+    }
   }
 }
 ```

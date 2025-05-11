@@ -6,9 +6,10 @@ import logging
 from datetime import timedelta
 from typing import Dict, Any, Optional
 from uuid import UUID
+import uuid
 
 from livekit import api
-from livekit.api import CreateRoomRequest, DeleteRoomRequest
+from livekit.api import CreateRoomRequest, DeleteRoomRequest, UpdateRoomMetadataRequest
 
 from app.config import settings
 
@@ -42,10 +43,11 @@ async def create_room(room_name: str, metadata: Optional[Dict[str, Any]] = None)
         
         # Set metadata if provided
         if metadata:
-            await client.room.update_room_metadata(
-                room_name=room_name,
+            metadata_request = UpdateRoomMetadataRequest(
+                room=room_name,
                 metadata=json.dumps(metadata)
             )
+            await client.room.update_room_metadata(metadata_request)
         
         return True
     
@@ -108,7 +110,7 @@ async def create_session(user_id: UUID, metadata: Optional[Dict[str, Any]] = Non
     """Create a LiveKit session"""
     try:
         # Generate session ID
-        session_id = str(UUID.uuid4())
+        session_id = str(uuid.uuid4())
         
         # Create room name
         room_name = f"voice-{session_id}"
@@ -117,9 +119,12 @@ async def create_session(user_id: UUID, metadata: Optional[Dict[str, Any]] = Non
         room_metadata = {
             "session_id": session_id,
             "user_id": str(user_id),
+            "conversation_id": metadata.get("conversation_id"),
+            "instructions": metadata.get("instructions"),
+            "voice_settings": metadata.get("voice_settings"),
             "metadata": metadata or {}
         }
-        
+
         await create_room(room_name, room_metadata)
         
         # Generate token for the user

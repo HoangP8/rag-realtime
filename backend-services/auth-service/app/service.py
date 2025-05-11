@@ -2,12 +2,14 @@
 Auth service implementation
 """
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from uuid import UUID
+from datetime import datetime
 
 from supabase import Client
+from fastapi import HTTPException, status
 
-from app.models import UserCreate, UserLogin, UserResponse, TokenResponse
+from app.models import UserCreate, UserLogin, UserResponse, TokenResponse, UserProfileUpdate, UserProfileResponse, UserPreferencesUpdate, UserPreferencesResponse
 
 
 class AuthService:
@@ -90,15 +92,140 @@ class AuthService:
     async def validate_token(self, token: str) -> UUID:
         """Validate token and return user ID"""
         try:
-            # Set auth token for the client
-            # self.supabase.auth.set_session()
+            # Basic validation for token format
+            if not token or not isinstance(token, str):
+                self.logger.error("Token is empty or not a string")
+                raise ValueError("Invalid token format: Token is empty or not a string")
+                
+            # Check if token has the correct JWT format (3 parts separated by dots)
+            parts = token.split('.')
+            if len(parts) != 3:
+                self.logger.error(f"Token has invalid number of segments: {len(parts)}")
+                raise ValueError(f"Invalid token format: Token has {len(parts)} segments, expected 3")
             
-            # Get user data
+            # Get user data from Supabase
             user = self.supabase.auth.get_user(token)
             
             # Return user ID
             return UUID(user.user.id)
         
+        except ValueError as e:
+            self.logger.error(f"Token validation error: {str(e)}")
+            raise
         except Exception as e:
             self.logger.error(f"Error validating token: {str(e)}")
+            raise
+
+    async def get_user_profile(self, user_id: UUID) -> Optional[UserProfileResponse]:
+        """Get user profile"""
+        try:
+            # Get user profile from the database
+            response = self.supabase.table("user_profiles").select("*").eq("id", str(user_id)).execute()
+            
+            if not response.data:
+                return None
+            
+            profile_data = response.data[0]
+            
+            # Get user email from auth
+            auth_user = self.supabase.auth.admin.get_user_by_id(str(user_id))
+            email = auth_user.user.email
+            
+            # Return profile data
+            return UserProfileResponse(
+                id=UUID(profile_data["id"]),
+                email=email,
+                first_name=profile_data.get("first_name"),
+                last_name=profile_data.get("last_name"),
+                date_of_birth=profile_data.get("date_of_birth"),
+                created_at=auth_user.user.created_at
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error getting user profile: {str(e)}")
+            raise
+    
+    async def update_user_profile(self, user_id: UUID, data: UserProfileUpdate) -> UserProfileResponse:
+        """Update user profile"""
+        try:
+            # Prepare update data
+            update_data = {}
+            if data.first_name is not None:
+                update_data["first_name"] = data.first_name
+            if data.last_name is not None:
+                update_data["last_name"] = data.last_name
+            if data.date_of_birth is not None:
+                update_data["date_of_birth"] = data.date_of_birth
+            
+            # Update profile in the database
+            response = self.supabase.table("user_profiles").update(update_data).eq("id", str(user_id)).execute()
+            
+            if not response.data:
+                raise HTTPException(status_code=404, detail="User profile not found")
+            
+            # Get updated profile
+            return await self.get_user_profile(user_id)
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error updating user profile: {str(e)}")
+            raise
+    
+    async def get_user_preferences(self, user_id: UUID) -> UserPreferencesResponse:
+        """Get user preferences"""
+        try:
+            # Get user profile from the database
+            response = self.supabase.table("user_profiles").select("id, preferences").eq("id", str(user_id)).execute()
+            
+            if not response.data:
+                raise HTTPException(status_code=404, detail="User preferences not found")
+            
+            profile_data = response.data[0]
+            
+            # Return preferences data
+            return UserPreferencesResponse(
+                id=UUID(profile_data["id"]),
+                user_id=user_id,
+                preferences=profile_data.get("preferences", {}),
+                updated_at=datetime.now()  # This would ideally come from the database
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error getting user preferences: {str(e)}")
+            raise
+    
+    async def update_user_preferences(self, user_id: UUID, data: UserPreferencesUpdate) -> UserPreferencesResponse:
+        """Update user preferences"""
+        try:
+            # Get current preferences
+            current_prefs_response = self.supabase.table("user_profiles").select("preferences").eq("id", str(user_id)).execute()
+            
+            if not current_prefs_response.data:
+                raise HTTPException(status_code=404, detail="User preferences not found")
+            
+            # Merge existing preferences with new ones
+            current_prefs = current_prefs_response.data[0].get("preferences", {})
+            updated_prefs = {**current_prefs, **data.preferences}
+            
+            # Update preferences in the database
+            response = self.supabase.table("user_profiles").update({"preferences": updated_prefs}).eq("id", str(user_id)).execute()
+            
+            if not response.data:
+                raise HTTPException(status_code=404, detail="User preferences not found")
+            
+            # Return updated preferences
+            return UserPreferencesResponse(
+                id=UUID(response.data[0]["id"]),
+                user_id=user_id,
+                preferences=updated_prefs,
+                updated_at=datetime.now()  # This would ideally come from the database
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error updating user preferences: {str(e)}")
             raise

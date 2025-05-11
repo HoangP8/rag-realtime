@@ -2,7 +2,7 @@
 Auth service models
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
@@ -43,3 +43,49 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
+
+# New models for profile functionality
+
+class UserProfileBase(BaseModel):
+    """Base user profile model"""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    date_of_birth: Optional[datetime] = None
+
+
+class UserProfileUpdate(UserProfileBase):
+    """User profile update model"""
+    pass
+
+
+class UserProfileResponse(UserProfileBase):
+    """User profile response model"""
+    id: UUID
+    email: EmailStr
+    created_at: datetime
+
+    class Config:
+        """Pydantic config"""
+        orm_mode = True
+
+
+class UserPreferencesBase(BaseModel):
+    """Base user preferences model"""
+    preferences: Dict[str, Any] = {}
+
+
+class UserPreferencesUpdate(UserPreferencesBase):
+    """User preferences update model"""
+    pass
+
+
+class UserPreferencesResponse(UserPreferencesBase):
+    """User preferences response model"""
+    id: UUID
+    user_id: UUID
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        """Pydantic config"""
+        orm_mode = True

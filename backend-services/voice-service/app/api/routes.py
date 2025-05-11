@@ -71,7 +71,7 @@ async def validate_user_id(authorization: str = Header(...)) -> Dict:
 
         try:
             # Set auth token for the client
-            # Note: We don't set the session here because we need to do it
+            # Note: We don't set the session here since we need to do it
             # before each database operation to ensure it's always set
 
             # Get user data
@@ -96,17 +96,6 @@ async def validate_user_id(authorization: str = Header(...)) -> Dict:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-# Routes
-@router.post("/session", response_model=VoiceSessionResponse)
-async def create_voice_session_legacy(
-    session_data: VoiceSessionCreate,
-    session_service: SessionService = Depends(get_session_service),
-    storage_service: StorageService = Depends(get_storage_service),
-    user_data: Dict = Depends(validate_user_id)
-):
-    """Create a new voice session (legacy endpoint for backwards compatibility)"""
-    return await create_voice_session(session_data, session_service, storage_service, user_data)
-
 @router.post("/session/create", response_model=VoiceSessionResponse)
 async def create_voice_session(
     session_data: VoiceSessionCreate,
@@ -123,8 +112,8 @@ async def create_voice_session(
         session = await session_service.create_session(
             user_id=user_id,
             conversation_id=session_data.conversation_id,
-            instructions=session_data.instructions,
-            voice_settings=session_data.voice_settings,
+            instructions=session_data.metadata.get("instructions"),
+            voice_settings=session_data.metadata.get("voice_settings"),
             metadata=session_data.metadata,
             auth_token=auth_token  # Pass auth token to the session service
         )
@@ -140,7 +129,7 @@ async def create_voice_session(
             status="active",
             token=session.token,
             room_name=session.room_name,
-            voice_settings=session.voice_settings,
+            config=session.config,
             metadata=session.metadata,
             created_at=session.created_at
         )
@@ -197,8 +186,7 @@ async def get_voice_session(
                 room_name=db_session.get("room_name", f"voice-{session_id}"),
                 token=token or db_session.get("token", ""),
                 status=db_session.get("status", "active"),
-                instructions=db_session.get("instructions"),
-                voice_settings=db_session.get("voice_settings", {}),
+                config=db_session.get("config", {}),
                 metadata=db_session.get("metadata", {}),
                 created_at=db_session.get("created_at", datetime.now())
             )
@@ -214,7 +202,7 @@ async def get_voice_session(
             status="active",
             token=session.token,
             room_name=session.room_name,
-            voice_settings=session.voice_settings,
+            config=session.config,
             metadata=session.metadata,
             created_at=session.created_at
         )
