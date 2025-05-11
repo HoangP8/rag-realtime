@@ -30,6 +30,8 @@ For cost efficiency during the trial phase, all microservices are deployed to a 
 - **Auth Service** (Port 8001): Handles authentication and user management
 - **Conversation Service** (Port 8002): Manages conversations and LLM interactions
 - **Voice Service** (Port 8003): Handles real-time voice communication
+- **Voice API**: Manages voice sessions and client connections
+- **LiveKit Agent Worker**: Handles real-time speech-to-speech functionality
 
 The services communicate with each other via localhost, eliminating the need for complex networking.
 
@@ -178,6 +180,8 @@ The current deployment runs all services on a single instance, which is suitable
    - Create separate Dockerfiles and fly.toml files for each service
    - Update service URLs to use fly.io's internal networking
    - Deploy each service individually
+   
+   Note: When scaling the voice service, both the API and worker components need to be deployed together.
 
 ## Troubleshooting
 
@@ -187,9 +191,11 @@ The current deployment runs all services on a single instance, which is suitable
 
 2. **Database connection issues**: Verify Supabase credentials and ensure your IP is allowed in Supabase settings.
 
-3. **Memory limitations**: If services crash due to memory constraints, increase the memory allocation in `fly.toml`.
+3. **Memory limitations**: If services crash due to memory constraints, increase the memory allocation in `fly.toml`. The voice service with its LiveKit agent may require more memory than other services.
 
 4. **API Gateway can't connect to services**: Ensure internal service URLs are correctly set to use localhost with the right ports.
+
+5. **Voice service issues**: If the voice service fails to start or crashes frequently, check that both the API and the worker component are running properly. Ensure all LiveKit credentials are correctly set.
 
 ### Restarting the Application
 

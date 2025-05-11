@@ -3,16 +3,23 @@ LiveKit Agents worker implementation
 """
 import json
 import logging
+import asyncio
+import uuid
 from typing import Dict, Any
 from uuid import UUID
 
-from livekit.agents import AgentSession, JobContext, WorkerOptions, cli
+from livekit import rtc
+from livekit.agents import AgentSession, JobContext, WorkerOptions, WorkerType, AutoSubscribe, cli
+from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 
 from app.config import settings
 from agent.agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_DELAY = 1  # seconds
 
 async def entrypoint(ctx: JobContext):
     """
@@ -21,42 +28,45 @@ async def entrypoint(ctx: JobContext):
     Args:
         ctx: Job context provided by LiveKit Agents
     """
-    try:
-        # Extract metadata from the room
-        metadata_str = ctx.room_metadata or "{}"
+    retry_count = 0
+    while retry_count < MAX_RETRIES:
         try:
-            metadata = json.loads(metadata_str)
-        except json.JSONDecodeError:
-            metadata = {}
-        
-        # Extract session information
-        session_id = metadata.get("session_id")
-        user_id_str = metadata.get("user_id")
-        conversation_id_str = metadata.get("conversation_id")
-        instructions = metadata.get("instructions")
-        voice_settings = metadata.get("voice_settings", {})
-        
-        # Validate required fields
-        if not session_id or not user_id_str:
-            logger.error("Missing required metadata: session_id or user_id")
-            return
-        
-        # Connect to the room
-        await ctx.connect()
-        
-        # Create the agent
-        agent = VoiceAgent(
-            session_id=session_id,
-            user_id=UUID(user_id_str),
-            conversation_id=UUID(conversation_id_str) if conversation_id_str else None,
-            instructions=instructions,
-            metadata=metadata.get("metadata", {})
-        )
-        
-        # Create the agent session with OpenAI components
-        session = AgentSession(
-            # Use OpenAI's realtime API for speech-to-speech
-            llm=openai.realtime.RealtimeModel(
+            # Extract metadata from the room
+            metadata_str = ctx.room_metadata or "{}"
+            try:
+                metadata = json.loads(metadata_str)
+            except json.JSONDecodeError:
+                metadata = {}
+            
+            # Extract session information
+            session_id = metadata.get("session_id")
+            user_id_str = metadata.get("user_id")
+            conversation_id_str = metadata.get("conversation_id")
+            instructions = metadata.get("instructions")
+            voice_settings = metadata.get("voice_settings", {})
+            
+            # Validate required fields
+            if not session_id or not user_id_str:
+                logger.error("Missing required metadata: session_id or user_id")
+                return
+            
+            # Connect to the room with auto-subscribe for audio
+            await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+            
+            # Wait for participant to join
+            participant = await ctx.wait_for_participant()
+            
+            # Create the agent
+            agent = VoiceAgent(
+                session_id=session_id,
+                user_id=UUID(user_id_str),
+                conversation_id=UUID(conversation_id_str) if conversation_id_str else None,
+                instructions=instructions,
+                metadata=metadata.get("metadata", {})
+            )
+            
+            # Configure real-time model
+            model = openai.realtime.RealtimeModel(
                 api_key=settings.OPENAI_API_KEY,
                 instructions=agent.instructions,
                 voice=voice_settings.get("voice_id", settings.DEFAULT_VOICE_ID),
@@ -69,21 +79,133 @@ async def entrypoint(ctx: JobContext):
                     silence_duration_ms=300,
                 ),
             )
-        )
-        
-        # Start the session with our agent and the room from the context
-        await session.start(agent=agent, room=ctx.room)
-        
-        # Wait for the session to end (when the room is disconnected)
-        await ctx.wait_until_done()
-    
-    except Exception as e:
-        logger.error(f"Error in agent entrypoint: {str(e)}")
-        raise
+            
+            # Create multimodal agent
+            assistant = MultimodalAgent(model=model)
+            assistant.start(ctx.room)
+            session = model.sessions[0]
+            
+            # Start with a greeting
+            session.conversation.item.create(
+                openai.realtime.ChatMessage(
+                    role="user",
+                    content="Please greet the user and ask how you can help them with their medical questions."
+                )
+            )
+            session.response.create()
+            
+            # Set up transcription handling
+            last_transcript_id = None
+            
+            @session.on("input_speech_started")
+            def on_input_speech_started():
+                nonlocal last_transcript_id
+                remote_participant = next(iter(ctx.room.remote_participants.values()), None)
+                if not remote_participant:
+                    return
+
+                track_sid = next(
+                    (
+                        track.sid
+                        for track in remote_participant.track_publications.values()
+                        if track.source == rtc.TrackSource.SOURCE_MICROPHONE
+                    ),
+                    None,
+                )
+                if last_transcript_id:
+                    asyncio.create_task(
+                        send_transcription(
+                            ctx, remote_participant, track_sid, last_transcript_id, ""
+                        )
+                    )
+
+                new_id = str(uuid.uuid4())
+                last_transcript_id = new_id
+                asyncio.create_task(
+                    send_transcription(
+                        ctx, remote_participant, track_sid, new_id, "…", is_final=False
+                    )
+                )
+            
+            @session.on("input_speech_transcription_completed")
+            def on_input_speech_transcription_completed(event):
+                nonlocal last_transcript_id
+                if last_transcript_id:
+                    remote_participant = next(iter(ctx.room.remote_participants.values()), None)
+                    if not remote_participant:
+                        return
+
+                    track_sid = next(
+                        (
+                            track.sid
+                            for track in remote_participant.track_publications.values()
+                            if track.source == rtc.TrackSource.SOURCE_MICROPHONE
+                        ),
+                        None,
+                    )
+                    asyncio.create_task(
+                        send_transcription(
+                            ctx, remote_participant, track_sid, last_transcript_id, ""
+                        )
+                    )
+                    last_transcript_id = None
+                    
+                    # Store user message in database
+                    if agent.conversation_id and event.text:
+                        asyncio.create_task(agent.store_transcription(event.text, "user"))
+            
+            @session.on("response_done")
+            def on_response_done(response):
+                # Store assistant response in database
+                if agent.conversation_id and response.text:
+                    asyncio.create_task(agent.store_transcription(response.text, "assistant"))
+            
+            # Wait for the session to end (when the room is disconnected)
+            await ctx.wait_until_done()
+            
+            # If we get here, the session ended normally
+            await agent.on_exit()
+            break
+            
+        except Exception as e:
+            retry_count += 1
+            logger.error(f"Error in agent entrypoint (attempt {retry_count}/{MAX_RETRIES}): {str(e)}")
+            
+            if retry_count < MAX_RETRIES:
+                logger.info(f"Retrying in {RETRY_DELAY} seconds...")
+                await asyncio.sleep(RETRY_DELAY)
+            else:
+                logger.error("Max retries reached, giving up")
+                raise
+
+async def send_transcription(
+    ctx: JobContext,
+    participant: rtc.Participant,
+    track_sid: str,
+    segment_id: str,
+    text: str,
+    is_final: bool = True,
+):
+    """Send transcription to the room"""
+    transcription = rtc.Transcription(
+        participant_identity=participant.identity,
+        track_sid=track_sid,
+        segments=[
+            rtc.TranscriptionSegment(
+                id=segment_id,
+                text=text,
+                start_time=0,
+                end_time=0,
+                language="en",
+                final=is_final,
+            )
+        ],
+    )
+    await ctx.room.local_participant.publish_transcription(transcription)
 
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(level=logging.INFO)
     
     # Run the worker with our entrypoint
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, worker_type=WorkerType.ROOM))

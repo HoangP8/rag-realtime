@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r api-gateway/requirements.txt \
     && pip install --no-cache-dir -r auth-service/requirements.txt \
     && pip install --no-cache-dir -r conversation-service/requirements.txt \
     && pip install --no-cache-dir -r voice-service/requirements.txt \
+    && pip install --no-cache-dir livekit>=0.3.4 livekit-agents>=0.2.0 \
     && pip install --no-cache-dir pydantic-settings>=2.0.3
 
 # Copy service code
@@ -27,8 +28,9 @@ COPY conversation-service/ /app/conversation-service/
 COPY voice-service/ /app/voice-service/
 COPY combined_service.py /app/
 
-# Make the combined service script executable
+# Make scripts executable
 RUN chmod +x /app/combined_service.py
+RUN find /app -name "*.sh" -exec chmod +x {} \;
 
 # Create a directory for logs
 RUN mkdir -p /app/logs

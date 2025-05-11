@@ -6,7 +6,7 @@ This is the API Gateway service for the Medical Chatbot application. It provides
 
 - Authentication and user management (via Auth Service)
 - Conversation management (via Conversation Service)
-- Voice session management (via Voice Service)
+- Voice session management (via Voice Service with integrated LiveKit Agent)
 - User profile management (via Auth Service)
 - Integration with Voice Service for real-time voice communication using OpenAI Realtime API
 
@@ -61,9 +61,6 @@ VOICE_SERVICE_URL=http://localhost:8003  # Example - Voice service address
 
 # RabbitMQ configuration (if needed)
 # RABBITMQ_HOST=localhost  # Example - RabbitMQ host
-# RABBITMQ_PORT=5672  # Example - RabbitMQ port
-# RABBITMQ_USER=guest  # Example - RabbitMQ username
-# RABBITMQ_PASSWORD=guest  # Example - RabbitMQ password
 ```
 
 ## Docker

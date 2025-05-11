@@ -26,6 +26,7 @@ class VoiceSession(BaseModel):
     user_id: UUID
     conversation_id: Optional[UUID] = None
     room_name: str
+    token: str
     status: str = "active"
     instructions: Optional[str] = None
     voice_settings: VoiceSettings

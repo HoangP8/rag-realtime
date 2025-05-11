@@ -5,12 +5,14 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from uuid import UUID
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Header
 
 from app.models import VoiceSessionCreate, VoiceSessionResponse, VoiceSession
 from app.services.session import SessionService
 from app.services.storage import StorageService
+from app.utils.livekit import generate_token
 
 router = APIRouter(prefix="/api/v1/voice")
 logger = logging.getLogger(__name__)
@@ -46,7 +48,7 @@ async def validate_token(authorization: str = Header(...)):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-async def validate_user_id(authorization: str = Header(...)) -> UUID:
+async def validate_user_id(authorization: str = Header(...)) -> Dict:
     """Validate user ID from authorization header"""
     if not authorization.startswith("Bearer "):
         raise HTTPException(
@@ -96,6 +98,16 @@ async def validate_user_id(authorization: str = Header(...)) -> UUID:
 
 # Routes
 @router.post("/session", response_model=VoiceSessionResponse)
+async def create_voice_session_legacy(
+    session_data: VoiceSessionCreate,
+    session_service: SessionService = Depends(get_session_service),
+    storage_service: StorageService = Depends(get_storage_service),
+    user_data: Dict = Depends(validate_user_id)
+):
+    """Create a new voice session (legacy endpoint for backwards compatibility)"""
+    return await create_voice_session(session_data, session_service, storage_service, user_data)
+
+@router.post("/session/create", response_model=VoiceSessionResponse)
 async def create_voice_session(
     session_data: VoiceSessionCreate,
     session_service: SessionService = Depends(get_session_service),
@@ -113,7 +125,8 @@ async def create_voice_session(
             conversation_id=session_data.conversation_id,
             instructions=session_data.instructions,
             voice_settings=session_data.voice_settings,
-            metadata=session_data.metadata
+            metadata=session_data.metadata,
+            auth_token=auth_token  # Pass auth token to the session service
         )
         
         # Store in database
@@ -151,10 +164,10 @@ async def get_voice_session(
         user_id = user_data["user_id"]
         auth_token = user_data["token"]
         
-        # Get session from service
+        # Get session from service cache
         session = await session_service.get_session(session_id)
         
-        # If not found in service, try to get from database
+        # If not found in service cache, try to get from database
         if not session:
             db_session = await storage_service.get_session(session_id, user_id, auth_token)
             if not db_session:
@@ -163,8 +176,35 @@ async def get_voice_session(
                     detail="Voice session not found"
                 )
             
-            # Convert to VoiceSession
-            session = VoiceSession(**db_session)
+            # Convert to VoiceSession and add a token
+            token = None
+            try:
+                # Generate a new token if possible
+                room_name = db_session.get("room_name", f"voice-{session_id}")
+                token = generate_token(
+                    room_name=room_name,
+                    identity=str(user_id),
+                    name=f"User {user_id}"
+                )
+            except Exception as e:
+                logger.warning(f"Error generating token for session {session_id}: {str(e)}")
+            
+            # Create session object
+            session = VoiceSession(
+                id=db_session.get("id", session_id),
+                user_id=user_id,
+                conversation_id=db_session.get("conversation_id"),
+                room_name=db_session.get("room_name", f"voice-{session_id}"),
+                token=token or db_session.get("token", ""),
+                status=db_session.get("status", "active"),
+                instructions=db_session.get("instructions"),
+                voice_settings=db_session.get("voice_settings", {}),
+                metadata=db_session.get("metadata", {}),
+                created_at=db_session.get("created_at", datetime.now())
+            )
+            
+            # Cache the session
+            session_service._add_to_cache(session)
         
         # Return response
         return VoiceSessionResponse(

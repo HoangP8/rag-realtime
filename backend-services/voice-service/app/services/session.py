@@ -19,7 +19,11 @@ class SessionService:
     
     def __init__(self):
         """Initialize session service"""
-        self.active_sessions = {}
+        # Keep a small cache for recently accessed sessions
+        # This reduces database load but doesn't cause scaling issues
+        # since we don't rely exclusively on in-memory storage
+        self.session_cache = {}
+        self.max_cache_size = 100
     
     async def create_session(
         self, 
@@ -27,7 +31,8 @@ class SessionService:
         conversation_id: Optional[UUID] = None,
         instructions: Optional[str] = None,
         voice_settings: Optional[VoiceSettings] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        auth_token: Optional[str] = None
     ) -> VoiceSession:
         """Create a new voice session"""
         try:
@@ -35,9 +40,11 @@ class SessionService:
             livekit_data = await create_session(
                 user_id=user_id,
                 metadata={
+                    "session_id": None,  # Will be set by create_session
                     "conversation_id": str(conversation_id) if conversation_id else None,
                     "instructions": instructions,
                     "voice_settings": voice_settings.model_dump() if voice_settings else None,
+                    "auth_token": auth_token,  # Pass auth token to agent
                     "metadata": metadata or {}
                 }
             )
@@ -56,6 +63,7 @@ class SessionService:
                 user_id=user_id,
                 conversation_id=conversation_id,
                 room_name=livekit_data["room_name"],
+                token=livekit_data["token"],
                 status="active",
                 instructions=instructions,
                 voice_settings=voice_settings,
@@ -63,8 +71,8 @@ class SessionService:
                 created_at=datetime.now()
             )
             
-            # Store in active sessions
-            self.active_sessions[session.id] = session
+            # Store in cache
+            self._add_to_cache(session)
             
             return session
         
@@ -73,19 +81,28 @@ class SessionService:
             raise
     
     async def get_session(self, session_id: str) -> Optional[VoiceSession]:
-        """Get a voice session"""
-        return self.active_sessions.get(session_id)
+        """
+        Get a voice session
+        First checks cache, then falls back to database (caller should implement)
+        """
+        # Check cache first
+        return self.session_cache.get(session_id)
     
     async def delete_session(self, session_id: str) -> bool:
         """Delete a voice session"""
         try:
-            # Get session
-            session = self.active_sessions.pop(session_id, None)
-            if not session:
-                return False
+            # Remove from cache
+            session = self.session_cache.pop(session_id, None)
+            
+            # If not in cache, we still attempt to delete the LiveKit room
+            # This handles cases where the session was created on another instance
+            room_name = f"voice-{session_id}" if not session else session.room_name
             
             # Delete LiveKit room
-            await delete_room(session.room_name)
+            try:
+                await delete_room(room_name)
+            except Exception as e:
+                logger.warning(f"Error deleting LiveKit room '{room_name}': {str(e)}")
             
             return True
         
@@ -100,26 +117,44 @@ class SessionService:
     ) -> bool:
         """Update session metadata"""
         try:
-            # Get session
-            session = await self.get_session(session_id)
+            # Get session from cache first
+            session = self.session_cache.get(session_id)
+            
+            # If not in cache, try to get from database first
+            # If found in database, use its room name
+            # Otherwise fall back to default room name
             if not session:
-                return False
+                session = await self.storage_service.get_session(session_id)
+                room_name = session.room_name if session else f"voice-{session_id}"
+            else:
+                room_name = session.room_name
             
             # Create LiveKit client
             client = create_livekit_client()
             
             # Update room metadata
             await client.room.update_room_metadata(
-                room_name=session.room_name,
+                room_name=room_name,
                 metadata=json.dumps(metadata)
             )
             
-            # Update session metadata
-            session.metadata = metadata
-            self.active_sessions[session_id] = session
+            # Update cache if session exists
+            if session:
+                session.metadata = metadata
+                self._add_to_cache(session)
             
             return True
         
         except Exception as e:
             logger.error(f"Error updating session metadata: {str(e)}")
             raise
+    
+    def _add_to_cache(self, session: VoiceSession):
+        """Add session to cache, removing oldest if cache is full"""
+        # Add to cache
+        self.session_cache[session.id] = session
+        
+        # Remove oldest if cache is full
+        if len(self.session_cache) > self.max_cache_size:
+            oldest_id = next(iter(self.session_cache))
+            self.session_cache.pop(oldest_id, None)

@@ -42,15 +42,6 @@ services:
     networks:
       - medical-chatbot-network
 
-  llm-service:
-    build: ./llm-service
-    ports:
-      - "8004:8004"
-    env_file:
-      - .env
-    networks:
-      - medical-chatbot-network
-
 networks:
   medical-chatbot-network:
     driver: bridge

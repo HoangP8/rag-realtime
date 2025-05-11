@@ -7,9 +7,16 @@ start_service() {
     local service_name=$1
     local port=$2
     
-    echo "Starting $service_name on port $port..."
-    cd $service_name && python -m uvicorn app.main:app --host 0.0.0.0 --port $port &
-    cd ..
+    # Special case for voice-service which needs both API and worker
+    if [ "$service_name" = "voice-service" ]; then
+        echo "Starting $service_name on port $port (with worker)..."
+        cd $service_name && ./scripts/run.sh &
+        cd ..
+    else
+        echo "Starting $service_name on port $port..."
+        cd $service_name && python -m uvicorn app.main:app --host 0.0.0.0 --port $port &
+        cd ..
+    fi
     
     # Wait for service to start
     sleep 2
@@ -19,6 +26,7 @@ start_service() {
 # Kill any existing processes
 echo "Stopping any existing services..."
 pkill -f "uvicorn app.main:app"
+pkill -f "python -m agent.worker"
 sleep 2
 
 # Start all services
@@ -42,4 +50,5 @@ read
 # Kill all services
 echo "Stopping all services..."
 pkill -f "uvicorn app.main:app"
+pkill -f "python -m agent.worker"
 echo "All services stopped"

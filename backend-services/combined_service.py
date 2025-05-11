@@ -33,8 +33,12 @@ services = [
         "command": "cd conversation-service && uvicorn app.main:app --host 0.0.0.0 --port 8002"
     },
     {
-        "name": "voice-service",
+        "name": "voice-service-api",
         "command": "cd voice-service && uvicorn app.main:app --host 0.0.0.0 --port 8003"
+    },
+    {
+        "name": "voice-service-worker",
+        "command": "cd voice-service && python -m agent.worker"
     }
 ]
 
