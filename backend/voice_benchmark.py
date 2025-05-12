@@ -11,7 +11,7 @@ from livekit.plugins import openai, deepgram, silero
 
 # Load environment variables
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
-AGENT_TYPE = "multimodal"  # "voice_pipeline" or "multimodal"
+AGENT_TYPE = "voice_pipeline"  # "voice_pipeline" or "multimodal"
 
 # Set up logging
 logger = logging.getLogger("voice-agent")
@@ -39,7 +39,6 @@ INSTRUCTIONS = """You are a HEALTHCARE ASSISTANT.
         2. If the user speaks in Vietnamese, respond ONLY in Vietnamese.
         3. If the user speaks in English, respond ONLY in English.
         4. Be clear, accessible, and concise in your explanations.
-        5. Start every conversation by saying: 'Hello! Xin chào! Tôi có thể giúp gì cho bạn?'
         """
 GREETING = "Xin chào! Bạn có khỏe không? Hello! How are you?"
 
@@ -84,12 +83,15 @@ def setup_latency_tracking(agent, state):
 
 async def voice_entrypoint(ctx: JobContext):
     # Initialize chat context
-    chat_ctx = llm.ChatContext()
-    chat_ctx.append(role="system", text=INSTRUCTIONS)
+    initial_ctx = llm.ChatContext().append(
+        role="system",
+        text=INSTRUCTIONS,
+    )
     
     # Connect to room
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     participant = await ctx.wait_for_participant()
+    logger.info(f"Starting voice pipeline assistant for {participant.identity}")
     
     # Set up voice pipeline agent
     agent = VoicePipelineAgent(
@@ -101,10 +103,10 @@ async def voice_entrypoint(ctx: JobContext):
         tts=openai.TTS(
             model="tts-1",  # tts-1-hd
             voice="coral"),
-        chat_ctx=chat_ctx,
+        chat_ctx=initial_ctx,
     )
     
-    # Initialize state
+    # Initialize state for latency measurement and conversation tracking
     state = {
         "warmup_done": False, 
         "question_end": None,
@@ -113,8 +115,9 @@ async def voice_entrypoint(ctx: JobContext):
     }    
     setup_latency_tracking(agent, state)
     
-    # Connect and perform warm-up
+    # Connect and warm-up
     agent.start(room=ctx.room, participant=participant)
+    await agent.say(GREETING)
     await asyncio.sleep(1)
     state["warmup_done"] = True
     logger.info("Warmup completed (fallback after delay)")
@@ -131,26 +134,31 @@ async def multimodal_entrypoint(ctx: JobContext):
         model="gpt-4o-realtime-preview-2024-12-17",
         modalities=["text", "audio"],
         voice="coral",
+        instructions=INSTRUCTIONS,
     )
     
-    # Chat context and agent setup
-    chat_ctx = llm.ChatContext()
-    chat_ctx.append(role="system", text=INSTRUCTIONS)
-    agent = MultimodalAgent(model=model, chat_ctx=chat_ctx)
+    # Agent setup
+    agent = MultimodalAgent(model=model)
     
-    # State for latency measurement and conversation tracking
+    # Initialize state for latency measurement and conversation tracking
     state = {
         "warmup_done": False, 
         "question_end": None,
         "current_question": None,
         "current_response": None
-    }
-    
-    # Set up event handlers for latency tracking
+    }    
     setup_latency_tracking(agent, state)
     
-    # Connect and perform warm-up
+    # Connect and warm-up
     agent.start(room=ctx.room, participant=participant)
+    session = model.sessions[0]
+    session.conversation.item.create(
+    llm.ChatMessage(
+        role="assistant",
+        content=GREETING,
+    )
+    )
+    session.response.create()
     await asyncio.sleep(1)
     state["warmup_done"] = True
     logger.info("Warmup completed (fallback after delay)")

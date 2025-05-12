@@ -89,15 +89,15 @@ async def generate_answers(dataset: Dataset, vectorstore: FAISS = None, llm: Cha
             )
             contexts = [doc.page_content for doc, score in retrieved_docs]
         
-        # Prepare user message with RAG information if available
-        user_message = f"Question: {question}"
+        # Prepare prompt based on whether we have contexts
+        system_prompt = template_prompt
         if contexts != []:
             context_str = "\n\n---\n\n".join([f"RAG information {i+1}:\n{ctx}" for i, ctx in enumerate(contexts)])
-            user_message = f"Thông tin từ cơ sở dữ liệu y tế Việt Nam:\n{context_str}\n\nQuestion: {question}"
+            system_prompt += f"\n\nHướng dẫn: Đây là thông tin từ cơ sở dữ liệu y tế Việt Nam. \n{context_str}"
         
         messages = [
-            {"role": "system", "content": template_prompt},
-            {"role": "user", "content": user_message}
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Question: {question}"}
         ]
         
         # Generate answer
@@ -153,11 +153,11 @@ async def run_benchmark(args):
     model_dir = logs_dir / f"k_{args.k}_chunk_size_{args.chunk_size}_{args.model}"
     model_dir.mkdir(exist_ok=True)
     
-    metrics_handler = logging.FileHandler(model_dir / "text_metrics.log")
+    metrics_handler = logging.FileHandler(model_dir / "text_metrics.log", encoding="utf-8")
     metrics_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
     metrics_logger.addHandler(metrics_handler)
 
-    qa_handler = logging.FileHandler(model_dir / "text_qa_results.log")
+    qa_handler = logging.FileHandler(model_dir / "text_qa_results.log", encoding="utf-8")
     qa_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
     qa_logger.addHandler(qa_handler)
 
