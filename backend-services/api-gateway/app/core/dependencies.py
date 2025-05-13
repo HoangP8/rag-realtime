@@ -1,11 +1,11 @@
 """
 FastAPI dependencies
 """
+import logging
 from typing import Optional
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status, Header
 
 from app.core.config import settings
 from app.services.auth import AuthService
@@ -14,8 +14,7 @@ from app.services.voice import VoiceService
 from app.services.profile import ProfileService
 from app.db.supabase import get_supabase_client
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
-
+logger = logging.getLogger(__name__)
 
 def get_supabase():
     """Get Supabase client"""
@@ -46,12 +45,13 @@ def get_profile_service():
     return ProfileService(supabase)
 
 
-async def get_current_user_and_token(token: str = Depends(oauth2_scheme)):
+async def get_current_user_and_token(token: str):
     """Get current user and token"""
     auth_service = get_auth_service()
-    # print(f"Auth Token: {token}")
+
     try:
         user_id = await auth_service.validate_token(token)
+        # logger.info(f"User ID: {user_id}")
         return {"user_id": user_id, "token": token}
     except Exception as e:
         raise HTTPException(
@@ -60,7 +60,7 @@ async def get_current_user_and_token(token: str = Depends(oauth2_scheme)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UUID:
+async def get_current_user(token: str) -> UUID:
     """Get current user from token"""
     user_data = await get_current_user_and_token(token)
     return user_data["user_id"]

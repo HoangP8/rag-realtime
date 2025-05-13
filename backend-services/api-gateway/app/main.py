@@ -12,7 +12,7 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Medical Chatbot API Gateway",
     version="0.1.0",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    # openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
 # Set up CORS middleware
@@ -21,7 +21,7 @@ app.add_middleware(
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "Authorization"],
 )
 
 # Include API router

@@ -1,7 +1,7 @@
 """
 Voice communication endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 
 from app.schemas.voice import VoiceSessionCreate, VoiceSessionResponse, VoiceSessionConfig
 from app.services.voice import VoiceService
@@ -14,10 +14,21 @@ router = APIRouter()
 async def create_voice_session(
     session_data: VoiceSessionCreate,
     voice_service: VoiceService = Depends(get_voice_service),
-    user_data = Depends(get_current_user_and_token)
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
 ):
     """Create a new voice session"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
         user_id = user_data["user_id"]
         token = user_data["token"]
         session = await voice_service.create_session(user_id, session_data, token)
@@ -33,10 +44,22 @@ async def create_voice_session(
 async def delete_voice_session(
     session_id: str,
     voice_service: VoiceService = Depends(get_voice_service),
-    user_data = Depends(get_current_user_and_token)
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
 ):
     """Delete a voice session"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+        user_id = user_data["user_id"]
         token = user_data["token"]
         success = await voice_service.delete_session(session_id, token)
         if not success:
@@ -58,10 +81,22 @@ async def delete_voice_session(
 async def get_voice_session_status(
     session_id: str,
     voice_service: VoiceService = Depends(get_voice_service),
-    user_data = Depends(get_current_user_and_token)
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
 ):
     """Get status of a voice session"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+        user_id = user_data["user_id"]
         token = user_data["token"]
         session = await voice_service.get_session_status(session_id, token)
         if not session:
@@ -84,10 +119,22 @@ async def update_voice_session_config(
     session_id: str,
     config_data: VoiceSessionConfig,
     voice_service: VoiceService = Depends(get_voice_service),
-    user_data = Depends(get_current_user_and_token)
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
 ):
     """Update configuration of a voice session"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+        user_id = user_data["user_id"]
         token = user_data["token"]
         session = await voice_service.update_session_config(session_id, config_data, token)
         if not session:

@@ -40,3 +40,4 @@ EXPOSE 8000
 
 # Run the combined service
 CMD ["python", "combined_service.py"]
+

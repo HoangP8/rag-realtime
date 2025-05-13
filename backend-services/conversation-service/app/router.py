@@ -4,7 +4,7 @@ Conversation service router
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.models import (
     ConversationCreate,

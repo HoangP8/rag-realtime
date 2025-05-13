@@ -23,7 +23,7 @@ load_dotenv(".env.local")
 
 # Base URL for the API
 # BASE_URL = "http://localhost:8000"
-BASE_URL = "https://medbot-backend.fly.dev/"
+BASE_URL = "https://medbot-backend.fly.dev"
 
 # Authentication token
 TOKEN = None
@@ -61,7 +61,10 @@ def login(email, password):
 def get_conversations():
     """Get all conversations"""
     url = f"{BASE_URL}/api/v1/conversations"
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "X-API-Auth": f"Bearer {TOKEN}",
+    }
     response = requests.get(url, headers=headers)
     print("Get Conversations Response:")
     print_response(response)
@@ -70,7 +73,10 @@ def get_conversations():
 def create_conversation(title="Test Conversation"):
     """Create a new conversation"""
     url = f"{BASE_URL}/api/v1/conversations"
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "X-API-Auth": f"Bearer {TOKEN}",
+    }
     data = {
         "title": title,
         "metadata": {},
@@ -84,7 +90,10 @@ def create_conversation(title="Test Conversation"):
 def get_conversation(conversation_id):
     """Get a specific conversation"""
     url = f"{BASE_URL}/api/v1/conversations/{conversation_id}"
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "X-API-Auth": f"Bearer {TOKEN}"
+    }
     response = requests.get(url, headers=headers)
     print("Get Conversation Response:")
     print_response(response)
@@ -93,7 +102,10 @@ def get_conversation(conversation_id):
 def create_message(conversation_id, content="Hello, this is a test message"):
     """Create a new message in a conversation"""
     url = f"{BASE_URL}/api/v1/conversations/{conversation_id}/messages"
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "X-API-Auth": f"Bearer {TOKEN}"
+    }
     data = {
         "role": "user",
         "content": content,
@@ -107,7 +119,10 @@ def create_message(conversation_id, content="Hello, this is a test message"):
 def get_messages(conversation_id):
     """Get all messages in a conversation"""
     url = f"{BASE_URL}/api/v1/conversations/{conversation_id}/messages"
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "X-API-Auth": f"Bearer {TOKEN}"
+    }
     response = requests.get(url, headers=headers)
     print("Get Messages Response:")
     print_response(response)
@@ -116,7 +131,10 @@ def get_messages(conversation_id):
 def create_voice_session(conversation_id):
     """Create a new voice session"""
     url = f"{BASE_URL}/api/v1/voice/session/create"
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "X-API-Auth": f"Bearer {TOKEN}"
+    }
     data = {
         "conversation_id": conversation_id,
         "metadata": {
@@ -131,7 +149,10 @@ def create_voice_session(conversation_id):
 def get_voice_session_status(session_id):
     """Get the status of a voice session"""
     url = f"{BASE_URL}/api/v1/voice/session/{session_id}/status"
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "X-API-Auth": f"Bearer {TOKEN}"
+    }
     response = requests.get(url, headers=headers)
     print("Get Voice Session Status Response:")
     print_response(response)
@@ -140,7 +161,10 @@ def get_voice_session_status(session_id):
 def get_user_profile():
     """Get the user profile"""
     url = f"{BASE_URL}/api/v1/profile"
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "X-API-Auth": f"Bearer {TOKEN}"
+    }
     response = requests.get(url, headers=headers)
     print("Get User Profile Response:")
     print_response(response)
@@ -181,6 +205,13 @@ def run_tests():
         print("Login failed. Exiting.")
         return
 
+    # # Validate token
+    # validate_url = f"{BASE_URL}/api/v1/auth/validate"
+    # validate_headers = {"Authorization": f"Bearer {TOKEN}"}
+    # validate_response = requests.get(validate_url, headers=validate_headers)
+    # print("Validate Token Response:")
+    # print_response(validate_response)
+
     # Get conversations
     get_conversations()
 
@@ -209,12 +240,24 @@ def run_tests():
         get_voice_session_status(session_id)
 
         # Delete voice session
-        delete_voice_response = requests.delete(f"{BASE_URL}/api/v1/voice/session/{session_id}", headers={"Authorization": f"Bearer {TOKEN}"})
+        delete_voice_response = requests.delete(
+            f"{BASE_URL}/api/v1/voice/session/{session_id}", 
+            headers={
+                "Authorization": f"Bearer {TOKEN}",
+                "X-API-Auth": f"Bearer {TOKEN}"
+            }
+        )
         print(f"Delete Voice Session Response:")
         print_response(delete_voice_response)
 
     # Delete test conversation
-    delete_response = requests.delete(f"{BASE_URL}/api/v1/conversations/{conversation_id}", headers={"Authorization": f"Bearer {TOKEN}"})
+    delete_response = requests.delete(
+        f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
+        headers={
+            "Authorization": f"Bearer {TOKEN}",
+            "X-API-Auth": f"Bearer {TOKEN}"
+        }
+    )
     print(f"Delete Conversation Response:")
     print_response(delete_response)
 
@@ -223,3 +266,11 @@ def run_tests():
 
 if __name__ == "__main__":
     run_tests()
+
+
+# curl -X POST https://medbot-backend.fly.dev/api/v1/auth/login \
+#     -H "Content-Type: application/json" \
+#     -d '{"email":"alice@demo.com","password":"Password123!"}'
+# flyctl ssh console
+# curl http://localhost:8001/api/v1/auth/validate \
+#     -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ3MDg0Nzc2LCJpYXQiOjE3NDcwODExNzYsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0NzA4MTE3Nn1dLCJzZXNzaW9uX2lkIjoiZjM3ODg1NWUtOTQ2Yi00Yjc0LTlmNzktYjk0YjQ3OTgyY2Q3IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.9B150TNAdFHbn3hAm_IVzgTa-trrYPGSkWZcpBqk66c"

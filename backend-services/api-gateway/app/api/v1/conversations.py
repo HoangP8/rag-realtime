@@ -4,7 +4,7 @@ Conversation endpoints
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
 
 from app.schemas.conversations import (
     ConversationCreate,
@@ -21,13 +21,30 @@ router = APIRouter()
 
 @router.get("/", response_model=List[ConversationResponse])
 async def get_conversations(
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_data = Depends(get_current_user_and_token)
 ):
+    # print(f"Authorization: {authorization}")
+    # print(f"X-API-Auth: {x_api_auth}")
+
     """Get all conversations for the current user"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+
         user_id = user_data["user_id"]
         token = user_data["token"]
+
         conversations = await conversation_service.get_user_conversations(user_id, token)
         return conversations
     except Exception as e:
@@ -40,13 +57,25 @@ async def get_conversations(
 @router.post("/", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
 async def create_conversation(
     conversation_data: ConversationCreate,
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_data = Depends(get_current_user_and_token)
 ):
     """Create a new conversation"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
         user_id = user_data["user_id"]
         token = user_data["token"]
+
         conversation = await conversation_service.create_conversation(user_id, conversation_data, token)
         return conversation
     except Exception as e:
@@ -59,12 +88,25 @@ async def create_conversation(
 @router.get("/{conversation_id}", response_model=ConversationResponse)
 async def get_conversation(
     conversation_id: UUID,
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_data = Depends(get_current_user_and_token)
 ):
     """Get a specific conversation"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+        user_id = user_data["user_id"]
         token = user_data["token"]
+
         conversation = await conversation_service.get_conversation(conversation_id, token)
         if not conversation:
             raise HTTPException(
@@ -85,12 +127,25 @@ async def get_conversation(
 async def update_conversation(
     conversation_id: UUID,
     conversation_data: ConversationUpdate,
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_data = Depends(get_current_user_and_token)
 ):
     """Update a conversation"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,   
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+        user_id = user_data["user_id"]
         token = user_data["token"]
+
         conversation = await conversation_service.update_conversation(
             conversation_id, conversation_data, token
         )
@@ -112,12 +167,25 @@ async def update_conversation(
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_conversation(
     conversation_id: UUID,
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_data = Depends(get_current_user_and_token)
 ):
     """Delete a conversation"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+        user_id = user_data["user_id"]
         token = user_data["token"]
+
         success = await conversation_service.delete_conversation(conversation_id, token)
         if not success:
             raise HTTPException(
@@ -137,12 +205,25 @@ async def delete_conversation(
 @router.get("/{conversation_id}/messages", response_model=List[MessageResponse])
 async def get_messages(
     conversation_id: UUID,
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_data = Depends(get_current_user_and_token)
 ):
     """Get all messages for a conversation"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+        user_id = user_data["user_id"]
         token = user_data["token"]
+
         messages = await conversation_service.get_conversation_messages(conversation_id, token)
         return messages
     except Exception as e:
@@ -156,12 +237,25 @@ async def get_messages(
 async def create_message(
     conversation_id: UUID,
     message_data: MessageCreate,
+    authorization: str = Header(None, alias="Authorization"),
+    x_api_auth: str = Header(None, alias="X-API-Auth"),
     conversation_service: ConversationService = Depends(get_conversation_service),
-    user_data = Depends(get_current_user_and_token)
 ):
     """Create a new message in a conversation"""
+    authorization = authorization or x_api_auth
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
+        token = authorization.replace("Bearer ", "")
+        user_data = await get_current_user_and_token(token)
+        user_id = user_data["user_id"]
         token = user_data["token"]
+        
         message = await conversation_service.create_message(conversation_id, message_data, token)
         return message
     except Exception as e:

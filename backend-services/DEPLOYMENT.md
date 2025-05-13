@@ -70,7 +70,7 @@ RABBITMQ_PASSWORD=your_rabbitmq_password
 
 Instead of including sensitive information in your deployment, set them as secrets in fly.io.
 
-Secrets can be set after the app is deployed. See next section for a quick start.
+Secrets need to be set after first-time deployment. See next section for a quick start.
 
 ```bash
 # Navigate to the backend-services directory
@@ -108,26 +108,52 @@ cd backend-services
 docker build -t medical-chatbot .
 
 # Run the container with environment variables
-docker run -p 8000:8000 --env-file .env medical-chatbot
+docker run -p 8000:8000 --env-file .env.local medical-chatbot
+
+# Open another terminal and build the livekit agent
+cd voice-service
+docker build -t worker-agent -f Dockerfile.worker . 
+
+# Run the container with environment variables
+docker run --env-file .env.local worker-agent
 ```
 
 Verify that all services start correctly and the API Gateway is accessible at http://localhost:8000.
 
 ### 2. Deploy to fly.io
 
+Deploy the backend services first:
+
 ```bash
 # Navigate to the backend-services directory
 cd backend-services
 
 # Launch the app (first-time deployment)
-flyctl launch
+flyctl launch --config fly.toml
 
 # Set the secrets
 cat .env.local | tr '\n' ' ' | xargs flyctl secrets set
 
 # For subsequent deployments
-flyctl deploy
+flyctl deploy --config fly.toml
 ```
+
+Deploy the voice service worker:
+
+```bash
+# Navigate to the voice-service directory
+cd backend-services/voice-service
+
+# Launch the worker app
+flyctl launch --config fly.worker.toml
+
+# Set the secrets
+cat .env.local | tr '\n' ' ' | xargs flyctl -a medbot-agent secrets set
+
+# For subsequent deployments
+flyctl deploy --config fly.worker.toml
+```
+
 
 During the first launch, fly.io will ask you several questions. You can accept most defaults, but make sure to:
 
@@ -139,13 +165,15 @@ During the first launch, fly.io will ask you several questions. You can accept m
 
 ```bash
 # Check the status of your app
-flyctl status
+flyctl -a medbot-backend status
 
 # View logs to ensure all services started correctly
-flyctl logs
+flyctl -a medbot-backend logs
 ```
 
-Your API should now be accessible at `https://medical-chatbot.fly.dev` (or your custom domain if configured).
+The API should now be accessible at `https://medbot-backend.fly.dev` (or your custom domain if configured).
+
+The agent should be accessible at `https://medbot-agent.fly.dev` (or your custom domain if configured).
 
 ## Monitoring and Logs
 
@@ -153,20 +181,20 @@ Your API should now be accessible at `https://medical-chatbot.fly.dev` (or your 
 
 ```bash
 # Stream logs in real-time
-flyctl logs
+flyctl -a medbot-backend logs
 
 # View recent logs
-flyctl logs --recent 100
+flyctl -a medbot-backend logs --recent 100
 ```
 
 ### Monitor app health
 
 ```bash
 # Check app status
-flyctl status
+flyctl -a medbot-backend status
 
 # View app metrics
-flyctl metrics
+flyctl -a medbot-backend metrics
 ```
 
 ## Scaling Considerations

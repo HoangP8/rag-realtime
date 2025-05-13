@@ -1,10 +1,11 @@
-fastapi>=0.100.0
-uvicorn>=0.23.0
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
+fastapi>=0.104.0
+uvicorn>=0.23.2
+pydantic>=2.4.2
+pydantic-settings>=2.0.3
 python-dotenv>=1.0.0
-livekit-agents>=1.0.0
-livekit-plugins-openai>=1.0.0
+livekit==0.17.5
+livekit-agents==0.10.2
+livekit-plugins-openai==0.10.4
 supabase>=1.0.0
 websockets>=11.0.0
 httpx>=0.24.0

@@ -17,6 +17,7 @@ from app.config import settings
 from app.models import TranscriptionMessage
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds
@@ -93,8 +94,14 @@ async def entrypoint(ctx: JobContext):
     retry_count = 0
     while retry_count < MAX_RETRIES:
         try:
+            logger.info(f"connecting to room {ctx.room.name}")
+            await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+
+            # Wait for participant to join
+            participant = await ctx.wait_for_participant()
+            
             # Extract metadata from the room
-            metadata_str = ctx.room_metadata or "{}"
+            metadata_str = participant.metadata or "{}"
             try:
                 metadata = json.loads(metadata_str)
             except json.JSONDecodeError:
@@ -123,12 +130,6 @@ async def entrypoint(ctx: JobContext):
             # Get instructions or use default
             if not instructions:
                 instructions = "You are a medical assistant. Help the user with their medical questions."
-            
-            # Connect to the room with auto-subscribe for audio
-            await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-            
-            # Wait for participant to join
-            participant = await ctx.wait_for_participant()
             
             # Configure real-time model
             model = openai.realtime.RealtimeModel(
@@ -256,8 +257,4 @@ async def entrypoint(ctx: JobContext):
                 raise
 
 if __name__ == "__main__":
-    # Configure logging
-    logging.basicConfig(level=logging.INFO)
-    
-    # Run the worker with our entrypoint
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, worker_type=WorkerType.ROOM))

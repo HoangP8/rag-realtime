@@ -13,10 +13,12 @@ start_service() {
     local port=$2
     local service_path="$SCRIPT_DIR/$service_name"
     
-    # Special case for voice-service which needs both API and worker
-    if [ "$service_name" = "voice-service" ]; then
-        echo "Starting $service_name on port $port (with worker)..."
-        cd "$service_path" && ./scripts/run.sh &
+    # Special case for voice-service API
+    if [ "$service_name" = "voice-service-agent" ]; then
+        echo "Starting $service_name..."
+        # make the script executable
+        chmod +x "voice-service/scripts/run_agent.sh"
+        cd "voice-service" && ./scripts/run_agent.sh &
         cd "$SCRIPT_DIR"
     else
         echo "Starting $service_name on port $port..."
@@ -44,12 +46,14 @@ start_service "api-gateway" 8000
 start_service "auth-service" 8001
 start_service "conversation-service" 8002
 start_service "voice-service" 8003
+start_service "voice-service-agent" 8003
 
 echo "All services started"
 echo "API Gateway: http://localhost:8000/docs"
 echo "Auth Service: http://localhost:8001/docs"
 echo "Conversation Service: http://localhost:8002/docs"
-echo "Voice Service: http://localhost:8003/docs"
+echo "Voice Service API: http://localhost:8003/docs"
+echo "Voice Service Worker: Running in background"
 
 # Wait for user input to stop services
 echo "Press Enter to stop all services..."

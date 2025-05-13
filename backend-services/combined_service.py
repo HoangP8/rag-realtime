@@ -33,13 +33,9 @@ services = [
         "command": "cd conversation-service && uvicorn app.main:app --host 0.0.0.0 --port 8002"
     },
     {
-        "name": "voice-service-api",
+        "name": "voice-service",
         "command": "cd voice-service && uvicorn app.main:app --host 0.0.0.0 --port 8003"
     },
-    {
-        "name": "voice-service-worker",
-        "command": "cd voice-service && python -m agent.worker"
-    }
 ]
 
 # Process list
