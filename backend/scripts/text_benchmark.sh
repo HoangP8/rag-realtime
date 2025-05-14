@@ -7,6 +7,9 @@ EMBEDDING_MODELS=("text-embedding-ada-002" "text-embedding-3-small" "text-embedd
 CHUNK_SIZES=(512 1024)
 K_VALUES=(3 5 7)
 
+# Set SSL_CERT_FILE variable
+unset SSL_CERT_FILE
+
 # Set the path to the text_benchmark.py script
 SCRIPT_DIR="$(dirname "$0")"
 TEXT_BENCHMARK_PY="$SCRIPT_DIR/../text_benchmark.py"
