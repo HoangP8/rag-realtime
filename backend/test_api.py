@@ -22,8 +22,8 @@ load_dotenv()
 load_dotenv(".env.local")
 
 # Base URL for the API
-# BASE_URL = "http://localhost:8000"
-BASE_URL = "https://medbot-backend.fly.dev"
+BASE_URL = "http://localhost:8000"
+# BASE_URL = "https://medbot-backend.fly.dev"
 
 # Authentication token
 TOKEN = None

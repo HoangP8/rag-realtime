@@ -305,6 +305,8 @@ async def entrypoint(ctx: JobContext):
 
     logger.info("Assistant initialized and ready")
 
+    last_transcript_id = None
+
     @session.on("input_speech_started")
     def on_input_speech_started():
         nonlocal last_transcript_id
@@ -379,14 +381,6 @@ async def entrypoint(ctx: JobContext):
                 role="assistant",
                 auth_token=auth_token
             ))
-    
-    # Wait for the session to end (when the room is disconnected)
-    await ctx.wait_until_done()
-    
-    # If we get here, the session ended normally
-    logger.info(f"Agent session {session_id} ended")
-    break
-
 
 async def store_transcription(
     conversation_id: UUID,
