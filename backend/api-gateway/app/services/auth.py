@@ -91,7 +91,9 @@ class AuthService:
                 # Return token data
                 return TokenResponse(
                     access_token=token_data["access_token"],
-                    refresh_token=token_data["refresh_token"]
+                    refresh_token=token_data["refresh_token"],
+                    expires_at=token_data["expires_at"],
+                    expires_in=token_data["expires_in"]
                 )
 
         except Exception as e:
@@ -124,7 +126,9 @@ class AuthService:
                 # Return token data
                 return TokenResponse(
                     access_token=token_data["access_token"],
-                    refresh_token=token_data["refresh_token"]
+                    refresh_token=token_data["refresh_token"],
+                    expires_at=token_data["expires_at"],
+                    expires_in=token_data["expires_in"]
                 )
 
         except Exception as e:

@@ -66,7 +66,9 @@ class AuthService:
             # Return token data
             return TokenResponse(
                 access_token=auth_response.session.access_token,
-                refresh_token=auth_response.session.refresh_token
+                refresh_token=auth_response.session.refresh_token,
+                expires_in=auth_response.session.expires_in,
+                expires_at=auth_response.session.expires_at,
             )
         
         except Exception as e:
@@ -82,7 +84,9 @@ class AuthService:
             # Return new token data
             return TokenResponse(
                 access_token=auth_response.session.access_token,
-                refresh_token=auth_response.session.refresh_token
+                refresh_token=auth_response.session.refresh_token,
+                expires_in=auth_response.session.expires_in,
+                expires_at=auth_response.session.expires_at,
             )
         
         except Exception as e:

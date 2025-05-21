@@ -14,12 +14,11 @@ COPY conversation-service/requirements.txt /app/conversation-service/
 COPY voice-service/requirements.txt /app/voice-service/
 
 # Install dependencies for all services
-RUN pip install --no-cache-dir -r api-gateway/requirements.txt \
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r api-gateway/requirements.txt \
     && pip install --no-cache-dir -r auth-service/requirements.txt \
     && pip install --no-cache-dir -r conversation-service/requirements.txt \
-    && pip install --no-cache-dir -r voice-service/requirements.txt \
-    && pip install --no-cache-dir livekit>=0.3.4 livekit-agents>=0.2.0 \
-    && pip install --no-cache-dir pydantic-settings>=2.0.3
+    && pip install --no-cache-dir -r voice-service/requirements.txt 
 
 # Copy service code
 COPY api-gateway/ /app/api-gateway/

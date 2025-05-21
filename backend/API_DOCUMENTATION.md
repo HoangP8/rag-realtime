@@ -95,6 +95,7 @@ To obtain a token, use the login endpoint. The token will be valid for a limited
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
+  "expires_at": "2023-01-01T12:00:00Z",
   "expires_in": 3600
 }
 ```
@@ -119,6 +120,7 @@ To obtain a token, use the login endpoint. The token will be valid for a limited
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
+  "expires_at": "2023-01-01T12:00:00Z",
   "expires_in": 3600
 }
 ```
