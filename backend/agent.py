@@ -6,7 +6,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Annotated, Any, Optional, Protocol
+from typing import Annotated, Any, Optional
 
 import langid
 from dotenv import load_dotenv
@@ -37,7 +37,6 @@ def log_event(event_type: str, content: Any):
     else:
         logger.info(f"{event_type}: {content}")
 
-
 def load_vectorstore(model_name: str, chunk_size: int = 1024) -> tuple[FAISS, OpenAIEmbeddings]:
     """Loads a FAISS vector store from disk."""
     start_time = time.time()
@@ -49,13 +48,6 @@ def load_vectorstore(model_name: str, chunk_size: int = 1024) -> tuple[FAISS, Op
     vectorstore = FAISS.load_local(model_folder, embeddings, allow_dangerous_deserialization=True)
     logger.info(f"Vector store loaded in {time.time() - start_time:.2f}s")
     return vectorstore, embeddings
-
-
-class _InputTranscriptionProto(Protocol):
-    item_id: str
-    """id of the item"""
-    transcript: str
-    """transcript of the input audio"""
 
 
 class MedicalFunctionContext(llm.FunctionContext):
@@ -71,7 +63,7 @@ class MedicalFunctionContext(llm.FunctionContext):
         self,
         query: Annotated[str, llm.TypeInfo(description="Query to search within the documents")],
         language: Annotated[str, llm.TypeInfo(description="Language of the query (en or vi)")] = "vi",
-        k: Annotated[int, llm.TypeInfo(description="Number of relevant documents to retrieve")] = 3,
+        k: Annotated[int, llm.TypeInfo(description="Number of relevant documents to retrieve")] = 1,
         score_threshold: Annotated[
             float, llm.TypeInfo(description="Minimum relevance score threshold")
         ] = 0.35,
@@ -122,7 +114,6 @@ class MedicalFunctionContext(llm.FunctionContext):
 
         # Log metrics and return
         metrics["total_time"] = time.time() - total_start
-        log_event("RAG METRICS", f"Total: {metrics['total_time']:.2f}s")
         self.query_metrics.append(metrics)
 
         return response
@@ -134,7 +125,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
     instruction_format = """You are a HEALTHCARE ASSISTANT.
     Your ONLY purpose is to provide healthcare and medical information.
     You can ONLY work (understand, speak, and answer) in two languages: Vietnamese or English.
-    Do NOT work on other languages, they are maybe noise from the user that you mistranslate.
+    Do NOT work on other languages, maybe there are noise in transcription.
     Be CONCISE and SMOOTH in your responses without hesitation, no need to repeat the same thing over and over again.
 
     IMPORTANT RULES:
@@ -145,7 +136,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
     4. Be clear, accessible, and concise in your explanations.
     5. Start every conversation by saying: 'Hello! Xin chào! Tôi có thể giúp gì cho bạn?'
 
-    RAG CONTEXT: {RAG_context}
+    RESPONSE BASED ON RAG CONTEXT HERE IF RELAVANT AND NOT EMPTY: {RAG_context}
     """
 
     def __init__(
@@ -174,45 +165,76 @@ class MedicalMultimodalAgent(MultimodalAgent):
         self.current_language = "en"
 
     def start(self, room: rtc.Room, participant: rtc.RemoteParticipant | str | None = None):
+        """Start the agent with timing logs."""
+        start_time = time.time()
         super().start(room, participant)
         self.setup_event_listeners()
+        log_event("TIMING", f"Agent start completed in {time.time() - start_time:.3f}s")
 
     async def add_rag_to_query(self, msg: str | None):
         """Detects language, performs RAG search, and updates instructions."""
+        
+        total_start_time = time.time()
         if not msg or msg.strip() == "":
             log_event("PROCESS", "Skipping empty message")
             return
 
         # Detect language
+        lang_start_time = time.time()
         self.current_language = self.detect_language(msg)
+        lang_time = time.time() - lang_start_time
+        log_event("TIMING", f"Language detection completed in {lang_time:.3f}s")
         log_event("PROCESS", f"Query: {msg}, Language: {self.current_language}")
 
+        # Add user message to chat context
+        if hasattr(self, '_chat_ctx') and self._chat_ctx is not None:
+            self._chat_ctx.append(text=msg, role="user")
+            log_event("DEBUG", f"CHAT CONTEXT: {len(self._chat_ctx.messages)} messages")
+            
         # Get RAG results
+        rag_start_time = time.time()
         result = await self.med_fnc_ctx.rag_search(query=msg, language=self.current_language)
-
+        rag_time = time.time() - rag_start_time
+        log_event("RAG", f"Rag results: {result}")
+        log_event("TIMING", f"RAG search completed in {rag_time:.3f}s")
+        
         # Update instructions with RAG context
+        update_start_time = time.time()
         new_instruction = self.instruction_format.format(RAG_context=result)
         self._session.session_update(instructions=new_instruction)
+        update_time = time.time() - update_start_time
+        log_event("TIMING", f"Instruction update completed in {update_time:.3f}s")
+        
+        # Generate reply
         self.generate_reply()
-
-        log_event("FINAL1", "instruction + rag:")
-        log_event("-", new_instruction)
-        log_event("FINAL2", "message:")
-        for index, messages in enumerate(self._session.chat_ctx_copy().messages):
-            log_event(index, messages)
+        
+        total_time = time.time() - total_start_time
+        log_event("TIMING", f"Total add_rag_to_query process completed in {total_time:.3f}s")
 
     def setup_event_listeners(self):
         """Configures speech event handlers."""
-
+        self.user_speech_end_time = None
+        
         @self._session.on("input_speech_transcription_completed")
-        def _input_speech_transcription_completed(ev: _InputTranscriptionProto):
+        def _input_speech_transcription_completed(ev):
+            self.user_speech_end_time = time.time()
+            log_event("TIMING", f"User finished speaking")
             asyncio.create_task(self.add_rag_to_query(ev.transcript))
+        
+        @self._session.on("response_content_added")
+        def _response_content_added(message):
+            if self.user_speech_end_time:
+                response_time = time.time() - self.user_speech_end_time
+                log_event("RESPONSE", f"Agent started responding after {response_time:.3f}s")
+                self.user_speech_end_time = None
+            else:
+                log_event("RESPONSE", "Agent started responding")                
 
     def detect_language(self, text: str) -> str:
         """Detects the language of the text."""
-        lang, _ = langid.classify(text)
-        return "vi" if lang == "vi" else "en"
-
+        lang, confidence = langid.classify(text)
+        result = "vi" if lang == "vi" else "en"
+        return result
 
 def get_user_active_chat_history(user_id: str = "user_test_123") -> Optional[llm.ChatContext]:
     """Initializes dummy chat history for testing."""
@@ -222,13 +244,9 @@ def get_user_active_chat_history(user_id: str = "user_test_123") -> Optional[llm
 
     dummy_history = [
         {"role": "user", "content": "Tôi tên là Hoàng, hãy gọi tên tôi mỗi khi bạn nói chuyện với tôi."},
-        {"role": "assistant", "content": "Xin chào anh Hoàng! Tôi là trợ lý y tế của anh."},
-        {"role": "user", "content": "Tôi vừa được chẩn đoán mắc bệnh tiểu đường 2 tháng trước. Đường huyết của tôi khoảng 180-200 mg/dL."},
-        {"role": "assistant", "content": "Cảm ơn anh Hoàng đã chia sẻ thông tin. Mức đường huyết của anh cao hơn mức mục tiêu."},
     ]
 
     messages = [llm.ChatMessage(role=item["role"], content=item["content"]) for item in dummy_history]
-
     return llm.ChatContext(messages=messages)
 
 
@@ -255,22 +273,11 @@ async def entrypoint(ctx: JobContext):
             threshold=0.5, prefix_padding_ms=200, silence_duration_ms=1000, create_response=False
         ),
     )
-
     chat_ctx = get_user_active_chat_history()
 
     # Initialize the assistant
     assistant = MedicalMultimodalAgent(model=model, chat_ctx=chat_ctx, vectorstore=vectorstore)
     assistant.start(ctx.room, participant)
-    log_event("STARTUP", "Assistant started")
-
-    # Warm-up RAG system
-    await assistant.med_fnc_ctx.rag_search(query="How are you today?", language="en")
-    log_event("WARMUP", "RAG system warmed up")
-
-    # Initial greeting if new chat
-    if chat_ctx is None:
-        assistant.generate_reply()
-
     logger.info("Assistant initialized and ready")
 
 
