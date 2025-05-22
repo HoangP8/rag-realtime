@@ -11,7 +11,7 @@ from livekit.plugins import openai, deepgram, silero
 
 # Load environment variables
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
-AGENT_TYPE = "voice_pipeline"  # "voice_pipeline" or "multimodal"
+AGENT_TYPE = "multimodal"  # "voice_pipeline" or "multimodal"
 
 # Set up logging
 logger = logging.getLogger("voice-agent")
@@ -29,19 +29,14 @@ logger.addHandler(console_handler)
 
 # Agent instructions
 INSTRUCTIONS = """You are a HEALTHCARE ASSISTANT.
-        Your ONLY purpose is to provide healthcare and medical information.
-        You can ONLY work (understand, speak, and answer) in two languages: Vietnamese or English.
-        Do NOT work on other languages, they are maybe noise from the user that you mistranslate.
-        Be CONCISE and SMOOTH in your responses without hesitation, no need to repeat the same thing over and over again.
+        Your ONLY purpose is to provide healthcare and medical information. For ANY other topics, politely refuse.
+        Languages: Vietnamese and English only. Ignore other languages.
+        Style: Be concise, clear, and avoid repetition.
+        
         IMPORTANT RULES:
-        1. ONLY answer healthcare/medical questions. For ANY other topics, politely refuse and remind the user
-            that you are a dedicated healthcare assistant, EVEN they ask about your health or other conditions.
-        2. If the user speaks in Vietnamese, respond ONLY in Vietnamese.
-        3. If the user speaks in English, respond ONLY in English.
-        4. Be clear, accessible, and concise in your explanations.
+        1. Respond in Vietnamese if user speaks Vietnamese
+        2. Respond in English if user speaks English
         """
-GREETING = "Xin chào! Bạn có khỏe không? Hello! How are you?"
-
 
 def setup_latency_tracking(agent, state):
     """Set up event handlers for latency tracking on the given agent."""
@@ -117,10 +112,6 @@ async def voice_entrypoint(ctx: JobContext):
     
     # Connect and warm-up
     agent.start(room=ctx.room, participant=participant)
-    await agent.say(GREETING)
-    await asyncio.sleep(1)
-    state["warmup_done"] = True
-    logger.info("Warmup completed (fallback after delay)")
 
 
 async def multimodal_entrypoint(ctx: JobContext):
@@ -129,15 +120,13 @@ async def multimodal_entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
     logger.info(f"Starting multimodal assistant for {participant.identity}")
     
-    # Real-time model configuration
+    # Agent setup
     model = openai.realtime.RealtimeModel(
         model="gpt-4o-realtime-preview-2024-12-17",
         modalities=["text", "audio"],
         voice="coral",
         instructions=INSTRUCTIONS,
     )
-    
-    # Agent setup
     agent = MultimodalAgent(model=model)
     
     # Initialize state for latency measurement and conversation tracking
@@ -151,18 +140,6 @@ async def multimodal_entrypoint(ctx: JobContext):
     
     # Connect and warm-up
     agent.start(room=ctx.room, participant=participant)
-    session = model.sessions[0]
-    session.conversation.item.create(
-    llm.ChatMessage(
-        role="assistant",
-        content=GREETING,
-    )
-    )
-    session.response.create()
-    await asyncio.sleep(1)
-    state["warmup_done"] = True
-    logger.info("Warmup completed (fallback after delay)")
-
 
 if __name__ == "__main__":
     
