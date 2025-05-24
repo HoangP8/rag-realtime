@@ -7,10 +7,10 @@ ffmpeg-python
 deepgram-sdk
 sentencepiece
 openai
-livekit-agents~=0.12.20
-livekit-plugins-openai~=0.12.3
-livekit-plugins-deepgram~=0.7.3
-livekit-plugins-silero~=0.7.5
+livekit-agents~=0.12.21
+livekit-plugins-openai~=0.12.4
+livekit-plugins-deepgram~=0.7.4
+livekit-plugins-silero~=0.7.6
 python-dotenv
 langchain
 langchain_community
