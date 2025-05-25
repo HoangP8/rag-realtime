@@ -218,7 +218,10 @@ class MedicalMultimodalAgent(MultimodalAgent):
 
 
 def get_user_active_chat_history(user_id: str = "user_test_123") -> Optional[llm.ChatContext]:
-    """Initializes dummy chat history for testing."""
+    """
+    Initializes dummy chat history for testing.
+    TODO: Remove this function and incorporate the real chat history from the database.
+    """
 
     if user_id != "user_test_123":
         return None

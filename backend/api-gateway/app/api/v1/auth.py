@@ -37,10 +37,10 @@ async def login(user_data: UserLogin, auth_service: AuthService = Depends(get_au
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(refresh_token: str, auth_service: AuthService = Depends(get_auth_service)):
+async def refresh_token(refresh_data: dict, auth_service: AuthService = Depends(get_auth_service)):
     """Refresh access token"""
     try:
-        token_data = await auth_service.refresh_token(refresh_token)
+        token_data = await auth_service.refresh_token(refresh_data["refresh_token"])
         return token_data
     except Exception as e:
         raise HTTPException(

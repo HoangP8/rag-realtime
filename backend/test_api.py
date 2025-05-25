@@ -27,6 +27,7 @@ BASE_URL = "http://localhost:8000"
 
 # Authentication token
 TOKEN = None
+REFRESH_TOKEN = None
 
 def print_response(response):
     """Print the response in a formatted way"""
@@ -44,6 +45,7 @@ def print_response(response):
 def login(email, password):
     """Login to the API and get a token"""
     global TOKEN
+    global REFRESH_TOKEN
     url = f"{BASE_URL}/api/v1/auth/login"
     data = {
         "email": email,
@@ -55,7 +57,23 @@ def login(email, password):
 
     if response.status_code == 200:
         TOKEN = response.json().get("access_token")
+        REFRESH_TOKEN = response.json().get("refresh_token")
         print(f"Token: {TOKEN} \n")
+    return response
+
+def refresh_token():
+    """Refresh the authentication token"""
+    global REFRESH_TOKEN
+    
+    url = f"{BASE_URL}/api/v1/auth/refresh"
+    response = requests.post(url, json={"refresh_token": REFRESH_TOKEN})
+    print("Refresh Token Response:")
+    print_response(response)
+    
+    if response.status_code == 200:
+        TOKEN = response.json().get("access_token")
+        REFRESH_TOKEN = response.json().get("refresh_token")
+        print(f"New Token: {TOKEN} \n")
     return response
 
 def get_conversations():
@@ -195,8 +213,9 @@ def run_tests():
         password = input("Enter your password: ")
 
     # Try to register first (this might fail if the user already exists)
+    # email = "register@test.com"
+    # password = "Password123!"
     # register_response = register_user(email, password)
-    # print(f"Registration attempt status: {register_response.status_code}")
 
     # Login
     login_response = login(email, password)
@@ -205,15 +224,11 @@ def run_tests():
         print("Login failed. Exiting.")
         return
 
-    # # Validate token
-    # validate_url = f"{BASE_URL}/api/v1/auth/validate"
-    # validate_headers = {"Authorization": f"Bearer {TOKEN}"}
-    # validate_response = requests.get(validate_url, headers=validate_headers)
-    # print("Validate Token Response:")
-    # print_response(validate_response)
+    # Refresh token
+    # refresh_token()
 
     # Get conversations
-    get_conversations()
+    # get_conversations()
 
     # Create a conversation
     create_response = create_conversation()
@@ -226,11 +241,11 @@ def run_tests():
     # Get the created conversation
     get_conversation(conversation_id)
 
-    # Create a message
-    create_message(conversation_id)
+    # # Create a message
+    # create_message(conversation_id)
 
-    # Get messages
-    get_messages(conversation_id)
+    # # Get messages
+    # get_messages(conversation_id)
 
     # Create a voice session
     voice_response = create_voice_session(conversation_id)
@@ -251,18 +266,18 @@ def run_tests():
         print_response(delete_voice_response)
 
     # Delete test conversation
-    delete_response = requests.delete(
-        f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
-        headers={
-            "Authorization": f"Bearer {TOKEN}",
-            "X-API-Auth": f"Bearer {TOKEN}"
-        }
-    )
-    print(f"Delete Conversation Response:")
-    print_response(delete_response)
+    # delete_response = requests.delete(
+    #     f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
+    #     headers={
+    #         "Authorization": f"Bearer {TOKEN}",
+    #         "X-API-Auth": f"Bearer {TOKEN}"
+    #     }
+    # )
+    # print(f"Delete Conversation Response:")
+    # print_response(delete_response)
 
     # Get user profile
-    get_user_profile()
+    # get_user_profile()
 
 if __name__ == "__main__":
     run_tests()

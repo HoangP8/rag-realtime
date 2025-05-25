@@ -92,6 +92,14 @@ class AuthService:
         except Exception as e:
             self.logger.error(f"Error refreshing token: {str(e)}")
             raise
+
+    async def logout_user(self) -> None:
+        """Logout a user"""
+        try:
+            self.supabase.auth.sign_out()
+        except Exception as e:
+            self.logger.error(f"Error logging out user: {str(e)}")
+            raise
     
     async def validate_token(self, token: str) -> UUID:
         """Validate token and return user ID"""

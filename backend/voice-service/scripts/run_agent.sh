@@ -5,4 +5,4 @@
 cd "$(dirname "$0")/.."
 
 echo "Starting LiveKit Agents worker..."
-python -m agent.worker dev
+python -m agent.worker start
