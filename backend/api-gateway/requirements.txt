@@ -18,3 +18,4 @@ bcrypt>=4.0.1
 langid
 langchain-community
 langchain-openai
+faiss-cpu

@@ -52,7 +52,6 @@ class WebSocketMessage(BaseModel):
 class TranscriptionMessage(BaseModel):
     """Transcription message model"""
     conversation_id: UUID
-    session_id: str
     role: str
     content: str
     message_type: str = "voice"

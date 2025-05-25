@@ -22,8 +22,8 @@ load_dotenv()
 load_dotenv(".env.local")
 
 # Base URL for the API
-BASE_URL = "http://localhost:8000"
-# BASE_URL = "https://medbot-backend.fly.dev"
+# BASE_URL = "http://localhost:8000"
+BASE_URL = "https://medbot-backend.fly.dev"
 
 # Authentication token
 TOKEN = None
@@ -213,7 +213,7 @@ def run_tests():
         password = input("Enter your password: ")
 
     # Try to register first (this might fail if the user already exists)
-    # email = "register@test.com"
+    # email = "register@test2.com"
     # password = "Password123!"
     # register_response = register_user(email, password)
 
@@ -283,9 +283,13 @@ if __name__ == "__main__":
     run_tests()
 
 
+
 # curl -X POST https://medbot-backend.fly.dev/api/v1/auth/login \
-#     -H "Content-Type: application/json" \
-#     -d '{"email":"alice@demo.com","password":"Password123!"}'
-# flyctl ssh console
-# curl http://localhost:8001/api/v1/auth/validate \
-#     -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ3MDg0Nzc2LCJpYXQiOjE3NDcwODExNzYsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0NzA4MTE3Nn1dLCJzZXNzaW9uX2lkIjoiZjM3ODg1NWUtOTQ2Yi00Yjc0LTlmNzktYjk0YjQ3OTgyY2Q3IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.9B150TNAdFHbn3hAm_IVzgTa-trrYPGSkWZcpBqk66c"
+#   -H "Content-Type: application/json" \
+#   -d '{"email": "alice@demo.com", "password": "Password123!"}'
+
+# curl -X POST https://medbot-backend.fly.dev/api/v1/voice/session/create \
+#   -H "Content-Type: application/json" \
+#   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTg3ODQ2LCJpYXQiOjE3NDgxODQyNDYsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0ODE4NDI0Nn1dLCJzZXNzaW9uX2lkIjoiNmJiMjViODItMzRiOC00MmYxLTgxYjMtMDFhYTI3ZGEwYTc2IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.-0c8FaBXdgLHd25GUW7PKDNGfwes0K9xhuz0QCogk3Q" \
+#   -H "X-API-Auth: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTg3ODQ2LCJpYXQiOjE3NDgxODQyNDYsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0ODE4NDI0Nn1dLCJzZXNzaW9uX2lkIjoiNmJiMjViODItMzRiOC00MmYxLTgxYjMtMDFhYTI3ZGEwYTc2IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.-0c8FaBXdgLHd25GUW7PKDNGfwes0K9xhuz0QCogk3Q" \
+#   -d '{"conversation_id": "260f1daa-b955-4cb9-907b-7d5e7a0f358d", "metadata": {"instructions": "You are a helpful medical assistant."}}'

@@ -7,6 +7,8 @@ import os
 import time
 from pathlib import Path
 from typing import Annotated, Any, Optional, Protocol
+import uuid
+from uuid import UUID
 
 import langid
 from dotenv import load_dotenv
@@ -247,7 +249,7 @@ async def entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
 
     # Extract metadata from the room
-    metadata_str = participant.metadata or "{}"
+    metadata_str = ctx.room.metadata
     try:
         metadata = json.loads(metadata_str)
     except json.JSONDecodeError:
@@ -286,7 +288,7 @@ async def entrypoint(ctx: JobContext):
         temperature=0.6,
         modalities=["audio", "text"],
         turn_detection=openai.realtime.ServerVadOptions(
-            threshold=0.5, prefix_padding_ms=200, silence_duration_ms=1000, create_response=False
+            threshold=0.5, prefix_padding_ms=200, silence_duration_ms=1000
         ),
         api_key=settings.OPENAI_API_KEY
     )
@@ -297,6 +299,7 @@ async def entrypoint(ctx: JobContext):
     assistant = MedicalMultimodalAgent(model=model, chat_ctx=chat_ctx, vectorstore=vectorstore)
     assistant.start(ctx.room, participant)
     log_event("STARTUP", "Assistant started")
+    session = model.sessions[0]
 
     # Warm-up RAG system
     await assistant.med_fnc_ctx.rag_search(query="How are you today?", language="en")
@@ -364,26 +367,69 @@ async def entrypoint(ctx: JobContext):
             last_transcript_id = None
             
             # Store user message in database
-            if conversation_id and event.text:
+            if conversation_id and event.transcript:
                 asyncio.create_task(store_transcription(
                     conversation_id=conversation_id,
                     session_id=session_id,
-                    text=event.text,
+                    text=event.transcript,
                     role="user",
                     auth_token=auth_token
                 ))
     
     @session.on("response_done")
-    def on_response_done(response):
-        # Store assistant response in database
-        if conversation_id and response.text:
-            asyncio.create_task(store_transcription(
-                conversation_id=conversation_id,
-                session_id=session_id,
-                text=response.text,
-                role="assistant",
-                auth_token=auth_token
-            ))
+    def on_response_done(response: openai.realtime.RealtimeResponse):
+        if response.status == "incomplete":
+            if response.status_details and response.status_details["reason"]:
+                reason = response.status_details["reason"]
+                if reason == "max_output_tokens":
+                    variant = "warning"
+                    title = "Max output tokens reached"
+                    description = "Response may be incomplete"
+                elif reason == "content_filter":
+                    variant = "warning"
+                    title = "Content filter applied"
+                    description = "Response may be incomplete"
+                else:
+                    variant = "warning"
+                    title = "Response incomplete"
+            else:
+                variant = "warning"
+                title = "Response incomplete"
+        elif response.status == "failed":
+            if response.status_details and response.status_details["error"]:
+                error_code = response.status_details["error"]["code"]
+                if error_code == "server_error":
+                    variant = "destructive"
+                    title = "Server error"
+                elif error_code == "rate_limit_exceeded":
+                    variant = "destructive"
+                    title = "Rate limit exceeded"
+                else:
+                    variant = "destructive"
+                    title = "Response failed"
+            else:
+                variant = "destructive"
+                title = "Response failed"
+        else:
+            # Store assistant response in database
+            if response.output is not None:
+                if type(response.output) == openai.realtime.RealtimeOutput:
+                    content_list = [response.output.content.text]
+                elif len(response.output) > 0:
+                    if type(response.output[0].content) == openai.realtime.RealtimeContent:
+                        content_list = [item.content.text for item in response.output]
+                    elif type(response.output[0].content) == list:
+                        content_group = [item.content for item in response.output]
+                        content_list = [item[0].text for item in content_group]
+            if conversation_id and content_list:
+                for content in content_list:
+                    asyncio.create_task(store_transcription(
+                        conversation_id=conversation_id,
+                        session_id=session_id,
+                        text=content,
+                        role="assistant",
+                        auth_token=auth_token
+                    ))
 
 async def store_transcription(
     conversation_id: UUID,
@@ -405,7 +451,6 @@ async def store_transcription(
         # Create message
         message = TranscriptionMessage(
             conversation_id=conversation_id,
-            session_id=session_id,
             role=role,
             content=text,
             message_type="voice",

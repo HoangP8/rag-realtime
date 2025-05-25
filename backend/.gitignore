@@ -1,3 +1,4 @@
 *.env.local
 *.ipynb
 .venv
+voice-service/agent/faiss
