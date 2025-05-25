@@ -204,7 +204,7 @@ class ConversationService:
             raise
 
     async def create_message(
-        self, user_id: UUID, token: str, conversation_id: UUID, data: MessageCreate
+        self, user_id: UUID, token: str, conversation_id: UUID, data: MessageCreate, generate_ai_response: bool = False
     ) -> MessageResponse:
         """Create a new message in a conversation"""
         try:
@@ -233,7 +233,7 @@ class ConversationService:
             user_message = MessageResponse(**response.data[0])
 
             # If this is a user message, generate AI response
-            if data.role == "user":
+            if data.role == "user" and generate_ai_response:
                 # Get conversation history
                 messages = await self.get_conversation_messages(user_id, token, conversation_id)
 

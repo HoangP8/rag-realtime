@@ -22,8 +22,8 @@ load_dotenv()
 load_dotenv(".env.local")
 
 # Base URL for the API
-# BASE_URL = "http://localhost:8000"
-BASE_URL = "https://medbot-backend.fly.dev"
+BASE_URL = "http://localhost:8000"
+# BASE_URL = "https://medbot-backend.fly.dev"
 
 # Authentication token
 TOKEN = None
@@ -242,39 +242,39 @@ def run_tests():
     get_conversation(conversation_id)
 
     # # Create a message
-    # create_message(conversation_id)
+    create_message(conversation_id)
 
     # # Get messages
     # get_messages(conversation_id)
 
     # Create a voice session
-    voice_response = create_voice_session(conversation_id)
-    if voice_response.status_code == 200:
-        session_id = voice_response.json().get("id")
-        # Get voice session status
-        get_voice_session_status(session_id)
+    # voice_response = create_voice_session(conversation_id)
+    # if voice_response.status_code == 200:
+    #     session_id = voice_response.json().get("id")
+    #     # Get voice session status
+    #     get_voice_session_status(session_id)
 
-        # Delete voice session
-        delete_voice_response = requests.delete(
-            f"{BASE_URL}/api/v1/voice/session/{session_id}", 
-            headers={
-                "Authorization": f"Bearer {TOKEN}",
-                "X-API-Auth": f"Bearer {TOKEN}"
-            }
-        )
-        print(f"Delete Voice Session Response:")
-        print_response(delete_voice_response)
+    #     # Delete voice session
+    #     delete_voice_response = requests.delete(
+    #         f"{BASE_URL}/api/v1/voice/session/{session_id}", 
+    #         headers={
+    #             "Authorization": f"Bearer {TOKEN}",
+    #             "X-API-Auth": f"Bearer {TOKEN}"
+    #         }
+    #     )
+    #     print(f"Delete Voice Session Response:")
+    #     print_response(delete_voice_response)
 
     # Delete test conversation
-    # delete_response = requests.delete(
-    #     f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
-    #     headers={
-    #         "Authorization": f"Bearer {TOKEN}",
-    #         "X-API-Auth": f"Bearer {TOKEN}"
-    #     }
-    # )
-    # print(f"Delete Conversation Response:")
-    # print_response(delete_response)
+    delete_response = requests.delete(
+        f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
+        headers={
+            "Authorization": f"Bearer {TOKEN}",
+            "X-API-Auth": f"Bearer {TOKEN}"
+        }
+    )
+    print(f"Delete Conversation Response:")
+    print_response(delete_response)
 
     # Get user profile
     # get_user_profile()
