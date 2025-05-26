@@ -308,6 +308,7 @@ async def entrypoint(ctx: JobContext):
         ),
         input_audio_transcription=openai.realtime.InputTranscriptionOptions(
             model="gpt-4o-transcribe",
+            prompt="Final transcription text must be vietnamese or english. Bản dịch cuối cùng phải là tiếng Việt hoặc tiếng Anh.",
         )
     )
     
