@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+WORKDIR /agent
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,11 +18,19 @@ RUN pip install --upgrade pip \
 COPY . .
 
 # Set environment variables
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/agent
 ENV PYTHONUNBUFFERED=1
 
-# Make the script executable
-RUN chmod +x "scripts/run_agent.sh"
+# Download vectorstore during build phase
+RUN cd agent && \
+    if [ ! -d "faiss" ]; then \
+        chmod +x ./scripts/download_vectorstore.sh && \
+        ./scripts/download_vectorstore.sh; \
+    fi && \
+    cd ..
 
-# Run the worker
-CMD ["scripts/run_agent.sh"]
+# Expose port
+EXPOSE 8081
+
+# Run the worker directly
+CMD ["python", "-m", "agent.worker", "start"]

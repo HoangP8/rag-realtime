@@ -15,4 +15,4 @@ fi
 cd ..
 
 echo "Starting LiveKit Agents worker..."
-python -m agent.worker start
+python -m agent.worker dev

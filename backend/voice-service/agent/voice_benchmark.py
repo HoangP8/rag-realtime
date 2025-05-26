@@ -28,20 +28,23 @@ logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
 # Agent instructions
-INSTRUCTIONS = """You are a HEALTHCARE ASSISTANT.
-        Your ONLY purpose is to provide healthcare and medical information.
-        You can ONLY work (understand, speak, and answer) in two languages: Vietnamese or English.
-        Do NOT work on other languages, they are maybe noise from the user that you mistranslate.
-        Be CONCISE and SMOOTH in your responses without hesitation, no need to repeat the same thing over and over again.
+INSTRUCTIONS = """
+    You are a HEALTHCARE ASSISTANT.
+    
+    PURPOSE: 
+    1. Provide medical and healthcare information.
+    2. For NON-medical topics: Politely refuse and redirect to health topics
+        
         IMPORTANT RULES:
-        1. ONLY answer healthcare/medical questions. For ANY other topics, politely refuse and remind the user
-            that you are a dedicated healthcare assistant, EVEN they ask about your health or other conditions.
-        2. If the user speaks in Vietnamese, respond ONLY in Vietnamese.
-        3. If the user speaks in English, respond ONLY in English.
-        4. Be clear, accessible, and concise in your explanations.
-        """
-GREETING = "Xin chào! Bạn có khỏe không? Hello! How are you?"
-
+        1. Respond in Vietnamese if user speaks Vietnamese
+        2. Respond in English if user speaks English
+    
+    LANGUAGE AND STYLE:
+       1. ONLY Vietnamese and English
+        2. Respond in Vietnamese if user speaks Vietnamese.
+        3. Respond in English if user speaks English.
+        4. Style: Concise, clear, easy to understand     
+    """
 
 def setup_latency_tracking(agent, state):
     """Set up event handlers for latency tracking on the given agent."""
@@ -96,12 +99,10 @@ async def voice_entrypoint(ctx: JobContext):
     # Set up voice pipeline agent
     agent = VoicePipelineAgent(
         vad=silero.VAD.load(),
-        stt=deepgram.STT(
-            model="nova-2-general",  # whisper-base, nova-2-general, whisper-medium
-        ),
-        llm=openai.LLM(model="gpt-4o"),
+        stt=openai.STT(model="whisper-1", detect_language=True), # whisper-1, gpt-4o-mini-transcribe, gpt-4o-transcribe
+        llm=openai.LLM(model="gpt-4o"), # gpt-4o-mini, gpt-4o
         tts=openai.TTS(
-            model="tts-1",  # tts-1-hd
+            model="gpt-4o-mini-tts", # tts-1, tts-1-hd
             voice="coral"),
         chat_ctx=initial_ctx,
     )
@@ -117,10 +118,6 @@ async def voice_entrypoint(ctx: JobContext):
     
     # Connect and warm-up
     agent.start(room=ctx.room, participant=participant)
-    await agent.say(GREETING)
-    await asyncio.sleep(1)
-    state["warmup_done"] = True
-    logger.info("Warmup completed (fallback after delay)")
 
 
 async def multimodal_entrypoint(ctx: JobContext):
@@ -129,15 +126,13 @@ async def multimodal_entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
     logger.info(f"Starting multimodal assistant for {participant.identity}")
     
-    # Real-time model configuration
+    # Agent setup
     model = openai.realtime.RealtimeModel(
-        model="gpt-4o-realtime-preview-2024-12-17",
+        model="gpt-4o-realtime-preview",
         modalities=["text", "audio"],
         voice="coral",
         instructions=INSTRUCTIONS,
     )
-    
-    # Agent setup
     agent = MultimodalAgent(model=model)
     
     # Initialize state for latency measurement and conversation tracking
@@ -151,18 +146,6 @@ async def multimodal_entrypoint(ctx: JobContext):
     
     # Connect and warm-up
     agent.start(room=ctx.room, participant=participant)
-    session = model.sessions[0]
-    session.conversation.item.create(
-    llm.ChatMessage(
-        role="assistant",
-        content=GREETING,
-    )
-    )
-    session.response.create()
-    await asyncio.sleep(1)
-    state["warmup_done"] = True
-    logger.info("Warmup completed (fallback after delay)")
-
 
 if __name__ == "__main__":
     

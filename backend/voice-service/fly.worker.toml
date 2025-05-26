@@ -1,25 +1,31 @@
-# fly.toml app configuration file generated for medbot-agent on 2025-05-13T02:51:36+07:00
+# fly.toml app configuration file generated for medbot-agent on 2025-05-26T00:28:44+07:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
 app = 'medbot-agent'
-primary_region = 'hkg'
+primary_region = 'sin'
+kill_timeout = '5m0s'
 
 [build]
   dockerfile = 'Dockerfile.worker'
+  ignorefile = '.dockerignore'
+
+[deploy]
+  strategy = 'bluegreen'
 
 [env]
-  PYTHONPATH = '/app'
   PYTHONUNBUFFERED = '1'
 
-[processes]
-  worker = 'scripts/run_agent.sh'
+[checks]
+  [checks.healthcheck]
+    port = 8081
+    type = 'tcp'
+    interval = '10s'
+    timeout = '2s'
+    grace_period = '5s'
 
 [[vm]]
+  memory = '4gb'
   cpu_kind = 'shared'
-  memory_mb = 512
-
-[[metrics]]
-  port = 9091
-  path = '/metrics'
+  cpus = 2
