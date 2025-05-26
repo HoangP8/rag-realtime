@@ -9,7 +9,7 @@ from datetime import datetime
 from supabase import create_client, Client
 
 from app.config import settings
-from app.models import VoiceSession, TranscriptionMessage
+from app.models import VoiceSession, TranscriptionMessage, MessageResponse
 
 logger = logging.getLogger(__name__)
 
@@ -133,4 +133,28 @@ class StorageService:
         
         except Exception as e:
             logger.error(f"Error storing transcription: {str(e)}")
+            raise
+
+    def get_conversation_history(self, user_id: UUID, conversation_id: UUID, auth_token: str) -> List[Dict[str, Any]]:
+        """Get the conversation history for a voice session"""
+        try:
+            # Set auth token
+            self.set_auth_token(auth_token)
+            
+            # Get conversation history from database
+            response = self.client.table("messages") \
+                .select("*") \
+                .eq("conversation_id", str(conversation_id)) \
+                .order("created_at") \
+                .execute()
+            
+            # Convert to response models
+            messages = []
+            for item in response.data:
+                messages.append(MessageResponse(**item))
+
+            return messages
+        
+        except Exception as e:
+            logger.error(f"Error getting conversation history: {str(e)}")
             raise

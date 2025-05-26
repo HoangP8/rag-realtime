@@ -45,6 +45,8 @@ import os
 import time
 from pathlib import Path
 from typing import Annotated, Any, Optional
+import uuid
+from uuid import UUID
 
 import langid
 from dotenv import load_dotenv
@@ -54,6 +56,8 @@ from livekit import rtc
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
 from livekit.agents.multimodal import AgentTranscriptionOptions, MultimodalAgent
 from livekit.plugins import openai
+
+from app.services.storage import StorageService
 
 # Basic setup
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
@@ -267,18 +271,24 @@ class MedicalMultimodalAgent(MultimodalAgent):
             log_event("ASSISTANT RESPONSE", f"{response}\n\n")    
 
 
-def get_user_active_chat_history(user_id: str = "user_test_123") -> Optional[llm.ChatContext]:
-    """Initializes dummy chat history for testing."""
-    if user_id != "user_test_123":
-        return None
+def get_user_active_chat_history(auth_token: str, user_id: str = "user_test_123", conversation_id: str = "conversation_test_123") -> Optional[llm.ChatContext]:
+    """Initializes chat history for user."""
+    storage_service = StorageService()
 
-    # Pre-create messages to avoid repeated object creation
-    dummy_history = [
-        {"role": "user", "content": "Tôi tên là Hoàng, hãy gọi tên tôi mỗi khi bạn nói chuyện với tôi."},
-        {"role": "user", "content": "Dạo này tôi bị đau đầu và căng thẳng trong công việc. Tôi cần được hỗ trợ về sức khỏe và tâm lý."}, 
-    ]
+    messages = storage_service.get_conversation_history(user_id, conversation_id, auth_token)
+    messages = [llm.ChatMessage(role=item.role, content=item.content) for item in messages]
 
-    messages = [llm.ChatMessage(role=item["role"], content=item["content"]) for item in dummy_history]
+    if user_id == "user_test_123" or not messages: # Get dummy history 
+        # Pre-create messages to avoid repeated object creation
+        # dummy_history = [
+        #     {"role": "user", "content": "Tôi tên là Hoàng, hãy gọi tên tôi mỗi khi bạn nói chuyện với tôi."},
+        #     {"role": "user", "content": "Dạo này tôi bị đau đầu và căng thẳng trong công việc. Tôi cần được hỗ trợ về sức khỏe và tâm lý."}, 
+        # ]
+        dummy_history = [
+            {"role": "user", "content": "Tôi tên là Hoàng, hãy bắt đầu gợi ý các câu hỏi về sức khỏe và tâm lý của tôi."},
+        ]
+        messages = [llm.ChatMessage(role=item["role"], content=item["content"]) for item in dummy_history]
+    
     return llm.ChatContext(messages=messages)
 
 
@@ -291,27 +301,26 @@ async def entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
     log_timing("LiveKit connection", time.time() - start_time)
 
-    # # Extract metadata from the room
-    # metadata_str = ctx.room.metadata
-    # try:
-    #     metadata = json.loads(metadata_str)
-    # except json.JSONDecodeError:
-    #     metadata = {}
+    # Extract metadata from the room
+    metadata_str = ctx.room.metadata
+    try:
+        metadata = json.loads(metadata_str)
+    except json.JSONDecodeError:
+        metadata = {}
     
-    # # Extract session information
-    # session_id = metadata.get("session_id")
-    # user_id_str = metadata.get("user_id")
-    # conversation_id_str = metadata.get("conversation_id")
-    # instructions = metadata.get("instructions")
-    # voice_settings = metadata.get("voice_settings", {})
-    # agent_metadata = metadata.get("metadata", {})
+    # Extract session information
+    session_id = metadata.get("session_id")
+    user_id_str = metadata.get("user_id")
+    conversation_id_str = metadata.get("conversation_id")
+    voice_settings = metadata.get("voice_settings", {})
+    agent_metadata = metadata.get("metadata", {})
 
-    # # Get auth token from metadata if available
-    # auth_token = agent_metadata.get("auth_token")
+    # Get auth token from metadata if available
+    auth_token = agent_metadata.get("auth_token")
 
-    # # Convert IDs to proper types
-    # user_id = UUID(user_id_str)
-    # conversation_id = UUID(conversation_id_str) if conversation_id_str else None
+    # Convert IDs to proper types
+    user_id = UUID(user_id_str)
+    conversation_id = UUID(conversation_id_str) if conversation_id_str else None
 
     # Load vectorstore
     vectorstore, _ = load_vectorstore("text-embedding-3-small", 1024)
@@ -330,12 +339,11 @@ async def entrypoint(ctx: JobContext):
         ),
         input_audio_transcription=openai.realtime.InputTranscriptionOptions(
             model="gpt-4o-transcribe",
-            prompt="Final transcription text must be vietnamese or english. Bản dịch cuối cùng phải là tiếng Việt hoặc tiếng Anh.",
         )
     )
     
-    # Load chat context
-    chat_ctx = get_user_active_chat_history()
+    # Load initial chat context
+    chat_ctx = get_user_active_chat_history(auth_token, user_id, conversation_id)
 
     # Initialize the assistant
     assistant = MedicalMultimodalAgent(model=model, chat_ctx=chat_ctx, vectorstore=vectorstore)

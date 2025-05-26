@@ -5,6 +5,10 @@ pydantic-settings>=2.0.3
 python-dotenv>=1.0.0
 supabase>=1.0.3
 openai>=1.3.0
+livekit==0.17.5
+livekit-agents==0.10.2
+livekit-plugins-openai==0.10.4
+livekit-protocol
 python-multipart>=0.0.6
 email-validator>=2.0.0
 httpx>=0.25.0
@@ -15,7 +19,3 @@ langid
 langchain-community
 langchain-openai
 faiss-cpu
-livekit-agents~=0.12.21
-livekit-plugins-openai~=0.12.4
-livekit-plugins-deepgram~=0.7.4
-livekit-plugins-silero~=0.7.6

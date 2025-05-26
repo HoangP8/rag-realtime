@@ -56,3 +56,21 @@ class TranscriptionMessage(BaseModel):
     content: str
     message_type: str = "voice"
     metadata: Optional[Dict[str, Any]] = None
+
+class MessageBase(BaseModel):
+    """Base message model"""
+    role: str = Field(..., description="Role: 'user', 'assistant', or 'system'")
+    content: str = Field(..., description="Message content")
+    message_type: str = Field("text", description="Message type: 'text' or 'voice'")
+    voice_url: Optional[str] = Field(None, description="URL to voice recording if applicable")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+class MessageResponse(MessageBase):
+    """Message response model"""
+    id: UUID
+    conversation_id: UUID
+    created_at: datetime
+
+    class Config:
+        """Pydantic config"""
+        orm_mode = True
