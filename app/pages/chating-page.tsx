@@ -10,16 +10,22 @@ import {
   Menu,
   MessageSquare,
   Stethoscope,
+  ArrowLeft,
 } from "lucide-react"
 import VoiceChatInterface from "@/components/voice-chat-interface"
 import ConversationHistory from "@/components/conversation-history"
 
-interface ChatLayoutProps {
+interface ChatingPageProps {
   currentUser: any
   onLogout: () => void
+  onReturn: () => void
 }
 
-export default function ChatLayout({ currentUser, onLogout }: ChatLayoutProps) {
+export default function ChatingPage({ 
+  currentUser, 
+  onLogout,
+  onReturn
+}: ChatingPageProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeConversation, setActiveConversation] = useState<string | null>(null)
 
@@ -102,9 +108,20 @@ export default function ChatLayout({ currentUser, onLogout }: ChatLayoutProps) {
                 <Menu className="h-5 w-5" />
               </Button>
             )}
-            <h1 className="text-lg font-semibold text-gray-900">
-              {activeConversation ? "Medical Consultation" : "New Medical Consultation"}
-            </h1>
+            <div className="flex items-center space-x-3">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onReturn}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Return</span>
+              </Button>
+              <h1 className="text-lg font-semibold text-gray-900">
+                Medical Consultation
+              </h1>
+            </div>
           </div>
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="sm">
@@ -120,4 +137,4 @@ export default function ChatLayout({ currentUser, onLogout }: ChatLayoutProps) {
       </div>
     </div>
   )
-}
+} 
