@@ -11,7 +11,7 @@ from livekit.plugins import openai, deepgram, silero
 
 # Load environment variables
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
-AGENT_TYPE = "multimodal"  # "voice_pipeline" or "multimodal"
+AGENT_TYPE = "voice_pipeline"  # "voice_pipeline" or "multimodal"
 
 # Set up logging
 logger = logging.getLogger("voice-agent")
@@ -28,15 +28,23 @@ logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
 # Agent instructions
-INSTRUCTIONS = """You are a HEALTHCARE ASSISTANT.
-        Your ONLY purpose is to provide healthcare and medical information. For ANY other topics, politely refuse.
-        Languages: Vietnamese and English only. Ignore other languages.
-        Style: Be concise, clear, and avoid repetition.
+INSTRUCTIONS = """
+    You are a HEALTHCARE ASSISTANT.
+    
+    PURPOSE: 
+    1. Provide medical and healthcare information.
+    2. For NON-medical topics: Politely refuse and redirect to health topics
         
         IMPORTANT RULES:
         1. Respond in Vietnamese if user speaks Vietnamese
         2. Respond in English if user speaks English
-        """
+    
+    LANGUAGE AND STYLE:
+       1. ONLY Vietnamese and English
+        2. Respond in Vietnamese if user speaks Vietnamese.
+        3. Respond in English if user speaks English.
+        4. Style: Concise, clear, easy to understand     
+    """
 
 def setup_latency_tracking(agent, state):
     """Set up event handlers for latency tracking on the given agent."""
@@ -91,12 +99,10 @@ async def voice_entrypoint(ctx: JobContext):
     # Set up voice pipeline agent
     agent = VoicePipelineAgent(
         vad=silero.VAD.load(),
-        stt=deepgram.STT(
-            model="nova-2-general",  # whisper-base, nova-2-general, whisper-medium
-        ),
-        llm=openai.LLM(model="gpt-4o"),
+        stt=openai.STT(model="whisper-1", detect_language=True), # whisper-1, gpt-4o-mini-transcribe, gpt-4o-transcribe
+        llm=openai.LLM(model="gpt-4o"), # gpt-4o-mini, gpt-4o
         tts=openai.TTS(
-            model="tts-1",  # tts-1-hd
+            model="gpt-4o-mini-tts", # tts-1, tts-1-hd
             voice="coral"),
         chat_ctx=initial_ctx,
     )
@@ -122,7 +128,7 @@ async def multimodal_entrypoint(ctx: JobContext):
     
     # Agent setup
     model = openai.realtime.RealtimeModel(
-        model="gpt-4o-realtime-preview-2024-12-17",
+        model="gpt-4o-realtime-preview",
         modalities=["text", "audio"],
         voice="coral",
         instructions=INSTRUCTIONS,
