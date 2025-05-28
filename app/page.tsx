@@ -5,6 +5,8 @@ import LoginForm from "@/components/login-form"
 import StartingPage from "./pages/starting-page"
 import ChatingPage from "./pages/chating-page"
 import { AuthAPI } from "@/lib/auth-api"
+import { VoiceSessionAPI } from "@/lib/voice-session-api"
+import { toast } from "sonner"
 
 type ViewState = "main" | "conversation"
 
@@ -13,7 +15,7 @@ export default function MedicalChatbot() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-  
+
   // Navigation state
   const [viewState, setViewState] = useState<ViewState>("main")
   const [activeConversation, setActiveConversation] = useState<string | null>(null)
@@ -54,8 +56,23 @@ export default function MedicalChatbot() {
     }
   }
 
-  const handleStartNewConversation = () => {
-    setViewState("conversation")
+  const handleStartNewConversation = async () => {
+    console.log('🚀 Starting new conversation...')
+
+    try {
+      // Create a new conversation via API
+      const conversation = await VoiceSessionAPI.createConversation("Medical Consultation")
+      console.log('✅ Created conversation with ID:', conversation.id)
+
+      // Store the conversation ID and navigate to chat
+      setActiveConversation(conversation.id)
+      setViewState("conversation")
+
+      toast.success('New conversation started!')
+    } catch (error) {
+      console.error('❌ Failed to create conversation:', error)
+      toast.error('Failed to start new conversation. Please try again.')
+    }
   }
 
   const handleReturnToMain = () => {
@@ -84,6 +101,7 @@ export default function MedicalChatbot() {
         currentUser={currentUser}
         onLogout={handleLogout}
         onReturn={handleReturnToMain}
+        conversationId={activeConversation}
       />
     )
   }

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eye, EyeOff, Stethoscope, AlertCircle } from "lucide-react"
 import { AuthAPI } from "@/lib/auth-api"
+import { setAuthToken, setRefreshToken } from "@/lib/auth-utils"
 
 interface LoginFormProps {
   onLogin: (user: any) => void
@@ -53,9 +54,11 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
       const result = await AuthAPI.login({email, password})
 
       if (result.access_token) {
-        // Store tokens
-        localStorage.setItem("access_token", result.access_token)
-        localStorage.setItem("refresh_token", result.refresh_token)
+        // Store tokens (use consistent key names)
+        setAuthToken(result.access_token)
+        if (result.refresh_token) {
+          setRefreshToken(result.refresh_token)
+        }
         onLogin({email}) // Pass minimal user object with email
       } else {
         setErrors({ general: "Email or password is incorrect" })
@@ -65,7 +68,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
     } finally {
       setIsLoading(false)
     }
-    
+
   }
 
   return (

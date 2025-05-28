@@ -147,7 +147,7 @@ export default function ConversationHistory({ onConversationSelect, activeConver
         <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-3">{title}</h3>
         <div className="space-y-1">
           {conversations.map((conv) => (
-            <button
+            <div
               key={conv.id}
               onClick={() => handleConversationClick(conv)}
               className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors group ${
@@ -155,7 +155,10 @@ export default function ConversationHistory({ onConversationSelect, activeConver
               }`}
             >
               <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
+                <div
+                  className="flex-1 min-w-0"
+                  onClick={() => onConversationSelect(conv.id)}
+                >
                   <p className="text-sm font-medium text-gray-900 truncate">{conv.title}</p>
                   <p className="text-xs text-gray-500 truncate mt-1">{conv.preview}</p>
                 </div>
@@ -166,7 +169,7 @@ export default function ConversationHistory({ onConversationSelect, activeConver
                   </Button>
                 </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </div>
@@ -211,4 +214,4 @@ export default function ConversationHistory({ onConversationSelect, activeConver
       </div>
     </div>
   )
-} 
+}

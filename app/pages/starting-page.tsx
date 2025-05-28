@@ -8,13 +8,13 @@ import ConversationHistory from "@/components/conversation-history"
 interface StartingPageProps {
   currentUser: any
   onLogout: () => void
-  onStartNewConversation: () => void
+  onStartNewConversation: () => void | Promise<void>
 }
 
-export default function StartingPage({ 
-  currentUser, 
-  onLogout, 
-  onStartNewConversation 
+export default function StartingPage({
+  currentUser,
+  onLogout,
+  onStartNewConversation
 }: StartingPageProps) {
   return (
     <div className="flex h-screen bg-white">
@@ -90,4 +90,4 @@ export default function StartingPage({
       </div>
     </div>
   )
-} 
+}

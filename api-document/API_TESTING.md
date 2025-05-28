@@ -113,7 +113,7 @@ curl -X POST https://medbot-backend.fly.dev/api/v1/auth/login \
 
 ### Conversations
 
-```bash
+```bashf
 # Get all conversations
 curl -X GET http://localhost:8000/api/v1/conversations \
   -H "Authorization: Bearer your_token_here"

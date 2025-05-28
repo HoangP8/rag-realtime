@@ -1,14 +1,23 @@
+import {
+  setAuthToken,
+  setRefreshToken,
+  getAccessToken,
+  clearAuthData
+} from '@/lib/auth-utils'
+
 interface LoginCredentials {
   email: string
   password: string
 }
 
 interface LoginResponse {
-  access_token: string,
-  refresh_token: string,
-  token_type: string,
-  expires_at: string,
-  expires_in: number
+  access_token?: string,
+  refresh_token?: string,
+  token_type?: string,
+  expires_at?: string,
+  expires_in?: number,
+  success?: boolean,
+  error?: string
 }
 
 interface LogoutResponse {
@@ -37,11 +46,11 @@ export class AuthAPI {
       }
 
       // Store token in localStorage if login successful
-      if (data.success && data.token) {
-        localStorage.setItem("auth_token", data.access_token)
-        localStorage.setItem("refresh_token", JSON.stringify(data.refresh_token))
-
-
+      if (data.success && data.access_token) {
+        setAuthToken(data.access_token)
+        if (data.refresh_token) {
+          setRefreshToken(data.refresh_token)
+        }
       }
 
       return data
@@ -56,11 +65,11 @@ export class AuthAPI {
 
   static async logout(): Promise<LogoutResponse> {
     try {
-      const token = localStorage.getItem("auth_token")
+      const token = getAccessToken()
 
       if (!token) {
         // Clear local storage even if no token
-        this.clearAuthData()
+        clearAuthData()
         return { success: true, message: "Logged out successfully" }
       }
 
@@ -75,7 +84,7 @@ export class AuthAPI {
       const data = await response.json()
 
       // Clear auth data regardless of server response
-      this.clearAuthData()
+      clearAuthData()
 
       if (!response.ok) {
         console.warn("Logout warning:", data.error)
@@ -87,7 +96,7 @@ export class AuthAPI {
     } catch (error) {
       console.error("Logout error:", error)
       // Clear local data even on error
-      this.clearAuthData()
+      clearAuthData()
       return {
         success: true,
         message: "Logged out locally due to error",
@@ -96,12 +105,11 @@ export class AuthAPI {
   }
 
   static clearAuthData(): void {
-    localStorage.removeItem("auth_token")
-    localStorage.removeItem("user_data")
+    clearAuthData()
   }
 
   static getStoredToken(): string | null {
-    return localStorage.getItem("auth_token")
+    return getAccessToken()
   }
 
   static getStoredUser(): any | null {

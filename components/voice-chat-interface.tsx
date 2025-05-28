@@ -1,35 +1,158 @@
 "use client"
 
-import { useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import {
+  LiveKitRoom,
+  useVoiceAssistant,
+  BarVisualizer,
+  RoomAudioRenderer,
+  VoiceAssistantControlBar,
+  AgentState,
+  DisconnectButton,
+} from "@livekit/components-react"
+import { useCallback, useEffect, useState } from "react"
+import { MediaDeviceFailure } from "livekit-client"
 import { Button } from "@/components/ui/button"
-import { Mic, X } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Phone, Loader2, Shield } from "lucide-react"
+import { toast } from "sonner"
+import { isAuthenticated } from "@/lib/auth-utils"
+import { NoAgentNotification } from "@/components/ui/NoAgentNotification"
+import { CloseIcon } from "@/components/ui/CloseIcon"
+import { VoiceSessionAPI } from "@/lib/voice-session-api"
 
-export default function VoiceChatInterface() {
-  const [isRecording, setIsRecording] = useState(false)
-  const [isListening, setIsListening] = useState(false)
+interface ConnectionDetails {
+  serverUrl: string
+  participantToken: string
+  participantName: string
+  roomName: string
+}
 
-  const handleMicClick = () => {
-    if (!isRecording) {
-      setIsRecording(true)
-      setIsListening(true)
-      console.log("Starting voice recording...")
+interface VoiceChatInterfaceProps {
+  conversationId?: string | null
+}
+
+export default function VoiceChatInterface({ conversationId }: VoiceChatInterfaceProps) {
+  const [connectionDetails, updateConnectionDetails] = useState<
+    ConnectionDetails | undefined
+  >(undefined)
+  const [agentState, setAgentState] = useState<AgentState>("disconnected")
+  const [userAuthenticated, setUserAuthenticated] = useState(false)
+  const [isConnecting, setIsConnecting] = useState(false)
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = () => {
+      const authenticated = isAuthenticated()
+      setUserAuthenticated(authenticated)
     }
-  }
 
-  const handleStopClick = () => {
-    setIsRecording(false)
-    setIsListening(false)
-    console.log("Stopping voice recording...")
+    checkAuth()
+    // Check auth status periodically
+    const interval = setInterval(checkAuth, 30000) // Check every 30 seconds
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const onConnectButtonClicked = useCallback(async () => {
+    if (!userAuthenticated) {
+      toast.error('Please log in to start a voice session')
+      return
+    }
+
+    try {
+      setIsConnecting(true)
+
+      let targetConversationId = conversationId
+
+      // If no conversationId provided, create a new conversation first
+      if (!targetConversationId) {
+        console.log('Creating new conversation...')
+        const conversation = await VoiceSessionAPI.createConversation("Voice Consultation")
+        targetConversationId = conversation.id
+        console.log('Created conversation with ID:', targetConversationId)
+      }
+
+      // Create voice session using the conversation ID
+      console.log('Creating voice session for conversation:', targetConversationId)
+      const voiceSessionResponse = await VoiceSessionAPI.createVoiceSession({
+        conversation_id: targetConversationId,
+        metadata: {
+          instructions: "You are a helpful medical assistant. Provide clear, accurate medical information while being empathetic and professional."
+        }
+      })
+
+      // Update connection details with the voice session response
+      updateConnectionDetails({
+        participantToken: voiceSessionResponse.token,
+        serverUrl: process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://medbot-livekit.livekit.cloud',
+        participantName: voiceSessionResponse.user_id,
+        roomName: `voice-session-${targetConversationId}`
+      })
+
+      console.log('Voice session created successfully')
+    } catch (error) {
+      console.error('Failed to create voice session:', error)
+      toast.error('Failed to connect to voice session')
+    } finally {
+      setIsConnecting(false)
+    }
+  }, [userAuthenticated, conversationId])
+
+  const onDeviceFailure = useCallback((error?: MediaDeviceFailure) => {
+    console.error(error)
+    alert(
+      "Error acquiring camera or microphone permissions. Please make sure you grant the necessary permissions in your browser and reload the tab"
+    )
+  }, [])
+
+  if (connectionDetails) {
+    return (
+      <main
+        data-lk-theme="default"
+        className="h-full grid content-center bg-[var(--lk-bg)]"
+      >
+        <LiveKitRoom
+          token={connectionDetails.participantToken}
+          serverUrl={connectionDetails.serverUrl}
+          connect={connectionDetails !== undefined}
+          audio={true}
+          video={false}
+          onMediaDeviceFailure={onDeviceFailure}
+          onDisconnected={() => {
+            updateConnectionDetails(undefined)
+          }}
+          className="grid grid-rows-[2fr_1fr] items-center"
+        >
+          <SimpleVoiceAssistant onStateChange={setAgentState} />
+          <ControlBar
+            onConnectButtonClicked={onConnectButtonClicked}
+            agentState={agentState}
+          />
+          <RoomAudioRenderer />
+          <NoAgentNotification state={agentState} />
+        </LiveKitRoom>
+      </main>
+    )
   }
 
   return (
     <div className="h-full flex flex-col items-center justify-center px-4 bg-gray-50">
+      {/* Authentication Warning */}
+      {!userAuthenticated && (
+        <Alert className="mb-6 max-w-md border-orange-200 bg-orange-50">
+          <Shield className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-800">
+            You need to be logged in to start a voice session. Please log in first.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Welcome Message */}
       <div className="text-center mb-16">
         <h2 className="text-3xl font-bold text-gray-900 mb-4">How can I help with your health today?</h2>
         <p className="text-lg text-gray-600 max-w-2xl">
-          I'm your AI medical assistant. Describe your symptoms or health concerns, and I'll provide helpful information
-          and guidance.
+          I'm your AI medical assistant. Start a voice consultation to discuss your symptoms or health concerns.
         </p>
       </div>
 
@@ -37,7 +160,7 @@ export default function VoiceChatInterface() {
       <div className="relative mb-16">
         <div
           className={`w-48 h-48 rounded-full bg-gradient-to-br from-blue-200 via-blue-400 to-blue-600 shadow-2xl transition-all duration-300 ${
-            isListening ? "animate-pulse scale-110" : "scale-100"
+            isConnecting ? "animate-pulse scale-110" : "scale-100"
           }`}
           style={{
             background: "radial-gradient(circle at 30% 30%, #e0f2fe, #42a5f5, #1565c0)",
@@ -47,51 +170,47 @@ export default function VoiceChatInterface() {
           {/* Inner glow effect */}
           <div
             className={`absolute inset-4 rounded-full bg-gradient-to-br from-white/30 to-transparent transition-opacity duration-300 ${
-              isListening ? "opacity-60" : "opacity-40"
+              isConnecting ? "opacity-60" : "opacity-40"
             }`}
           />
 
-          {/* Listening indicator */}
-          {isListening && <div className="absolute inset-0 rounded-full border-4 border-blue-300 animate-ping" />}
+          {/* Connecting indicator */}
+          {isConnecting && <div className="absolute inset-0 rounded-full border-4 border-blue-300 animate-ping" />}
         </div>
       </div>
 
       {/* Control buttons */}
       <div className="flex items-center gap-8 mb-8">
-        {/* Microphone button */}
+        {/* Start Session button */}
         <Button
-          onClick={handleMicClick}
-          disabled={isRecording}
+          onClick={onConnectButtonClicked}
+          disabled={!userAuthenticated || isConnecting || !!connectionDetails}
           size="lg"
-          className={`w-16 h-16 rounded-full transition-all duration-200 ${
-            isRecording ? "bg-red-500 hover:bg-red-600" : "bg-gray-600 hover:bg-gray-700"
-          }`}
+          className="w-16 h-16 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
         >
-          <Mic className="h-6 w-6 text-white" />
-        </Button>
-
-        {/* Stop button */}
-        <Button
-          onClick={handleStopClick}
-          disabled={!isRecording}
-          size="lg"
-          variant="outline"
-          className="w-16 h-16 rounded-full border-2 border-gray-300 hover:border-gray-400 disabled:opacity-50"
-        >
-          <X className="h-6 w-6 text-gray-600" />
+          {isConnecting ? (
+            <Loader2 className="h-6 w-6 text-white animate-spin" />
+          ) : (
+            <Phone className="h-6 w-6 text-white" />
+          )}
         </Button>
       </div>
 
       {/* Status text */}
       <div className="text-center">
-        {isRecording ? (
+        {isConnecting ? (
           <div className="space-y-2">
-            <p className="text-lg text-gray-700 font-medium">Listening...</p>
-            <p className="text-sm text-gray-500">Speak clearly about your health concerns</p>
+            <p className="text-lg text-gray-700 font-medium">Connecting to voice session...</p>
+            <p className="text-sm text-gray-500">Please wait while we set up your consultation</p>
+          </div>
+        ) : !userAuthenticated ? (
+          <div className="space-y-2">
+            <p className="text-lg text-orange-600 font-medium">Please log in first</p>
+            <p className="text-sm text-orange-500">You need to be authenticated to start a voice consultation</p>
           </div>
         ) : (
           <div className="space-y-2">
-            <p className="text-lg text-gray-500">Tap the microphone to start your consultation</p>
+            <p className="text-lg text-gray-500">Tap the phone icon to start your voice consultation</p>
             <p className="text-sm text-gray-400">Your conversation is private and secure</p>
           </div>
         )}
@@ -114,4 +233,57 @@ export default function VoiceChatInterface() {
       </div>
     </div>
   )
+}
+
+function SimpleVoiceAssistant(props: {
+  onStateChange: (state: AgentState) => void;
+}) {
+  const { state, audioTrack } = useVoiceAssistant();
+  useEffect(() => {
+    props.onStateChange(state);
+  }, [props, state]);
+  return (
+    <div className="h-[300px] max-w-[90vw] mx-auto">
+      <BarVisualizer
+        state={state}
+        barCount={5}
+        trackRef={audioTrack}
+        className="agent-visualizer"
+        options={{ minHeight: 24 }}
+      />
+    </div>
+  );
+}
+
+function ControlBar(props: {
+  onConnectButtonClicked: () => void;
+  agentState: AgentState;
+}) {
+
+  return (
+    <div className="relative h-[100px]">
+      <AnimatePresence>
+        {props.agentState !== "disconnected" &&
+          props.agentState !== "connecting" && (
+            <motion.div
+              initial={{ opacity: 0, top: "10px" }}
+              animate={{ opacity: 1, top: 0 }}
+              exit={{ opacity: 0, top: "-10px" }}
+              transition={{ duration: 0.4, ease: [0.09, 1.04, 0.245, 1.055] }}
+              className="flex h-8 absolute left-1/2 -translate-x-1/2  justify-center"
+            >
+              <VoiceAssistantControlBar controls={{ leave: false }} />
+              <DisconnectButton>
+                <CloseIcon />
+              </DisconnectButton>
+            </motion.div>
+          )}
+      </AnimatePresence>
+      {props.agentState === "connecting" && (
+        <div className="absolute left-1/2 -translate-x-1/2 text-center">
+          <p className="text-sm text-gray-600">Connecting to agent...</p>
+        </div>
+      )}
+    </div>
+  );
 }

@@ -19,15 +19,17 @@ interface ChatingPageProps {
   currentUser: any
   onLogout: () => void
   onReturn: () => void
+  conversationId?: string | null
 }
 
-export default function ChatingPage({ 
-  currentUser, 
+export default function ChatingPage({
+  currentUser,
   onLogout,
-  onReturn
+  onReturn,
+  conversationId
 }: ChatingPageProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [activeConversation, setActiveConversation] = useState<string | null>(null)
+  const [activeConversation, setActiveConversation] = useState<string | null>(conversationId || null)
 
   const handleNewChat = () => {
     setActiveConversation(null)
@@ -109,9 +111,9 @@ export default function ChatingPage({
               </Button>
             )}
             <div className="flex items-center space-x-3">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={onReturn}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
               >
@@ -132,9 +134,9 @@ export default function ChatingPage({
 
         {/* Chat Content */}
         <div className="flex-1">
-          <VoiceChatInterface />
+          <VoiceChatInterface conversationId={activeConversation} />
         </div>
       </div>
     </div>
   )
-} 
+}

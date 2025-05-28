@@ -2,9 +2,9 @@
 
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-
+// Main Frame is the frame in the middle of each page. 
 interface MainFrameProps {
-  onStartNewConversation: () => void
+  onStartNewConversation: () => void | Promise<void>
 }
 
 export default function MainFrame({ onStartNewConversation }: MainFrameProps) {
@@ -18,7 +18,7 @@ export default function MainFrame({ onStartNewConversation }: MainFrameProps) {
           Start a new conversation to discuss your health concerns with our AI medical assistant.
         </p>
       </div>
-      
+
       <Button
         onClick={onStartNewConversation}
         className="bg-blue-600 hover:bg-blue-700 text-white h-12 px-6 rounded-full flex items-center gap-2 text-base font-semibold"
@@ -34,4 +34,4 @@ export default function MainFrame({ onStartNewConversation }: MainFrameProps) {
       </div>
     </div>
   )
-} 
+}
