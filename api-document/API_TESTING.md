@@ -105,6 +105,12 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
   -d '{"email": "your_email@example.com", "password": "your_password"}'
 ```
 
+```bash
+curl -X POST https://medbot-backend.fly.dev/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "alice@demo.com", "password": "Password123!"}'
+```
+
 ### Conversations
 
 ```bash
@@ -112,10 +118,20 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 curl -X GET http://localhost:8000/api/v1/conversations \
   -H "Authorization: Bearer your_token_here"
 
+# Get all conversations
+curl -X GET https://medbot-backend.fly.dev/api/v1/conversations/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MzI1MTcwLCJpYXQiOjE3NDgzMjE1NzAsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0ODMyMTU3MH1dLCJzZXNzaW9uX2lkIjoiM2RkMzcyODUtZTFkZi00MzY5LTllZWQtOWRhN2U4NGNmZTA4IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0._zX_1j-DdCvq4SJA-C6wqZQE-KaZkDhjX7PzvxkOQ6s" \
+  -H "X-API-Auth: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MzI1MTcwLCJpYXQiOjE3NDgzMjE1NzAsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0ODMyMTU3MH1dLCJzZXNzaW9uX2lkIjoiM2RkMzcyODUtZTFkZi00MzY5LTllZWQtOWRhN2U4NGNmZTA4IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0._zX_1j-DdCvq4SJA-C6wqZQE-KaZkDhjX7PzvxkOQ6s"
+
 # Create a conversation
 curl -X POST http://localhost:8000/api/v1/conversations \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_token_here" \
+  -d '{"title": "Test Conversation", "metadata": {}, "tags": ["test"]}'
+
+curl -X -I POST https://medbot-backend.fly.dev/api/v1/conversations\
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4Mjk0NDkyLCJpYXQiOjE3NDgyOTA4OTIsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0ODI5MDg5Mn1dLCJzZXNzaW9uX2lkIjoiNmZjYTM2ZjQtOGI1MC00ZDQ5LTljYzUtZTJhZGEwNTNjMzI3IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.VA2SHVxZGci8uiGgpYPuWC1zLwjHYrxxXoxn51rwJRc" \
   -d '{"title": "Test Conversation", "metadata": {}, "tags": ["test"]}'
 
 # Get a specific conversation
@@ -135,6 +151,10 @@ curl -X POST http://localhost:8000/api/v1/conversations/your_conversation_id/mes
 # Get all messages in a conversation
 curl -X GET http://localhost:8000/api/v1/conversations/your_conversation_id/messages \
   -H "Authorization: Bearer your_token_here"
+
+curl -X GET https://medbot-backend.fly.dev/api/v1/conversations/34aedd94-e1e6-4e81-9fff-4d2060736692/messages \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MzQyMTczLCJpYXQiOjE3NDgzMzg1NzMsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0ODMzODU3M31dLCJzZXNzaW9uX2lkIjoiYmY4Y2E5OTEtNWZhYi00OTJiLWJiMTctZjMwZmFjMjZiMzQ0IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.Uo4zgnBE2c3PNRKMHPaf8uLinB4hx3ePCcRT30jipic"
+
 ```
 
 ### Voice
@@ -145,6 +165,11 @@ curl -X POST http://localhost:8000/api/v1/voice/session/create \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_token_here" \
   -d '{"conversation_id": "your_conversation_id", "metadata": {"instructions": "You are a helpful medical assistant."}}'
+
+curl -X POST http://medbot-backend.fly.dev/api/v1/voice/session/create \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ik9hZkR2TXR6Uk40N1hVTEciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL213anpxeWJkb2V4d3JmenBwZGdvLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIyZDhiMmExYS1jNmYzLTRiMDQtOWRhZi0wNTcwZTU4MzhkYzQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4Mjk0NDkyLCJpYXQiOjE3NDgyOTA4OTIsImVtYWlsIjoiYWxpY2VAZGVtby5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc0ODI5MDg5Mn1dLCJzZXNzaW9uX2lkIjoiNmZjYTM2ZjQtOGI1MC00ZDQ5LTljYzUtZTJhZGEwNTNjMzI3IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.VA2SHVxZGci8uiGgpYPuWC1zLwjHYrxxXoxn51rwJRc" \
+  -d '{"conversation_id": "", "metadata": {"instructions": "You are a helpful medical assistant."}}'
 
 # Get voice session status
 curl -X GET http://localhost:8000/api/v1/voice/session/your_session_id/status \

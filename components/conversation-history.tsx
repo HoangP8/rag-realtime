@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -9,12 +9,15 @@ import {
   Clock,
   MoreHorizontal,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface Conversation {
   id: string
   title: string
-  timestamp: Date
-  preview: string
+  created_at: string
+  updated_at: string
+  metadata?: Record<string, any>
+  preview?: string // Added for compatibility with existing code
 }
 
 interface ConversationHistoryProps {
@@ -24,47 +27,75 @@ interface ConversationHistoryProps {
 
 export default function ConversationHistory({ onConversationSelect, activeConversation }: ConversationHistoryProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
-  // Mock conversation data - replace with real data from your API
-  const conversations: Conversation[] = [
-    {
-      id: "1",
-      title: "Chest Pain Consultation",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      preview: "Discussed symptoms of chest discomfort...",
-    },
-    {
-      id: "2",
-      title: "Blood Pressure Check",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      preview: "Reviewed blood pressure readings...",
-    },
-    {
-      id: "3",
-      title: "Medication Review",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // Yesterday
-      preview: "Discussed current medications and side effects...",
-    },
-    {
-      id: "4",
-      title: "Follow-up Appointment",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
-      preview: "Scheduled follow-up for test results...",
-    },
-    {
-      id: "5",
-      title: "Allergy Symptoms",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 1 week ago
-      preview: "Discussed seasonal allergy management...",
-    },
-  ]
+  const handleConversationClick = (conversation: Conversation) => {
+    if (onConversationSelect) {
+      onConversationSelect(conversation)
+    }
+    router.push(`/chat/${conversation.id}`)
+  }
+
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        setLoading(true)
+        // Get token from localStorage
+        const access_token = localStorage.getItem("access_token")
+        
+        if (!access_token) {
+          setError("Not authenticated")
+          setLoading(false)
+          return
+        }
+
+        const response = await fetch("https://medbot-backend.fly.dev/api/v1/conversations/", {
+          headers: {
+            "Authorization": `Bearer ${access_token}`,
+            "X-API-Auth": `Bearer ${access_token}` 
+          }
+        })
+
+        if (!response.ok) {
+          console.log("Response Fail")
+          throw new Error(`Failed to fetch conversations: ${response.status}`)
+        }
+        else 
+        {
+          console.log("Response: OK")
+        }
+
+        const data = await response.json()
+        
+        // Add preview field for compatibility with existing code
+        const conversationsWithPreview = data.map((conv: Conversation) => ({
+          ...conv,
+          preview: conv.metadata?.lastMessage || "No messages yet..."
+        }))
+        
+        setConversations(conversationsWithPreview)
+        setError(null)
+      } catch (err) {
+        console.error("Error fetching conversations:", err)
+        setError(err instanceof Error ? err.message : "Failed to load conversations")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchConversations()
+  }, [])
 
   const groupConversationsByTime = (conversations: Conversation[]) => {
+    // Set the time milestones based on current time
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
     const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-
+    // Create groups of conversations including today, yesterday, previousWeek and older
     const groups = {
       today: [] as Conversation[],
       yesterday: [] as Conversation[],
@@ -73,11 +104,11 @@ export default function ConversationHistory({ onConversationSelect, activeConver
     }
 
     conversations.forEach((conv) => {
-      if (conv.timestamp >= today) {
+      if (new Date(conv.updated_at) >= today) {
         groups.today.push(conv)
-      } else if (conv.timestamp >= yesterday) {
+      } else if (new Date(conv.updated_at) >= yesterday) {
         groups.yesterday.push(conv)
-      } else if (conv.timestamp >= weekAgo) {
+      } else if (new Date(conv.updated_at) >= weekAgo) {
         groups.previousWeek.push(conv)
       } else {
         groups.older.push(conv)
@@ -95,8 +126,9 @@ export default function ConversationHistory({ onConversationSelect, activeConver
 
   const groupedConversations = groupConversationsByTime(filteredConversations)
 
-  const formatTime = (date: Date) => {
+  const formatTime = (dateString: string) => {
     const now = new Date()
+    const date = new Date(dateString)
     const diff = now.getTime() - date.getTime()
     const minutes = Math.floor(diff / (1000 * 60))
     const hours = Math.floor(diff / (1000 * 60 * 60))
@@ -117,7 +149,7 @@ export default function ConversationHistory({ onConversationSelect, activeConver
           {conversations.map((conv) => (
             <button
               key={conv.id}
-              onClick={() => onConversationSelect(conv.id)}
+              onClick={() => handleConversationClick(conv)}
               className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors group ${
                 activeConversation === conv.id ? "bg-gray-100" : ""
               }`}
@@ -128,7 +160,7 @@ export default function ConversationHistory({ onConversationSelect, activeConver
                   <p className="text-xs text-gray-500 truncate mt-1">{conv.preview}</p>
                 </div>
                 <div className="flex items-center space-x-1 ml-2">
-                  <span className="text-xs text-gray-400">{formatTime(conv.timestamp)}</span>
+                  <span className="text-xs text-gray-400">{formatTime(conv.updated_at)}</span>
                   <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0">
                     <MoreHorizontal className="h-3 w-3" />
                   </Button>
