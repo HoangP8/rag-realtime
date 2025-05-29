@@ -13,6 +13,7 @@ class UserProfileBase(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     date_of_birth: Optional[date] = None
+    preferences: Dict[str, Any] = Field(default_factory=dict)
 
 
 class UserProfileUpdate(UserProfileBase):

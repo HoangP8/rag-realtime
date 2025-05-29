@@ -36,7 +36,9 @@ class AuthService:
                 "id": user_id,
                 "first_name": user_data.first_name,
                 "last_name": user_data.last_name,
-                "preferences": {}
+                "preferences": {
+                    "isVietnamese": True
+                }
             }
             
             self.supabase.table("user_profiles").insert(profile_data).execute()
@@ -160,6 +162,7 @@ class AuthService:
                 first_name=profile_data.get("first_name"),
                 last_name=profile_data.get("last_name"),
                 date_of_birth=profile_data.get("date_of_birth"),
+                preferences=profile_data.get("preferences", {}),
                 created_at=profile_data.get("created_at"),
                 updated_at=profile_data.get("updated_at")
             )
@@ -179,6 +182,8 @@ class AuthService:
                 update_data["last_name"] = data.last_name
             if data.date_of_birth is not None:
                 update_data["date_of_birth"] = data.date_of_birth
+            if data.preferences is not None:
+                update_data["preferences"] = data.preferences
             
             # Update profile in the database
             response = self.supabase.table("user_profiles").update(update_data).eq("id", str(user_id)).execute()

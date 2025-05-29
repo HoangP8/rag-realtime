@@ -4,6 +4,7 @@ Main FastAPI application entry point
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.middleware import RateLimitMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
@@ -23,6 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*", "Authorization"],
 )
+
+# Add rate limiting middleware
+app.add_middleware(RateLimitMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)

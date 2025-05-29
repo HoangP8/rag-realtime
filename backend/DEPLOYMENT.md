@@ -39,7 +39,7 @@ The services communicate with each other via localhost, eliminating the need for
 
 ### 1. Create a .env file
 
-Create a `.env` file in the `backend-services` directory with the following variables:
+Create a `.env` file in the `backend` directory with the following variables:
 
 ```
 # Supabase credentials
@@ -74,7 +74,7 @@ Secrets need to be set after first-time deployment. See next section for a quick
 
 ```bash
 # Navigate to the backend-services directory
-cd backend-services
+cd backend
 
 # Set secrets from your .env file
 flyctl secrets set NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -101,8 +101,8 @@ flyctl secrets set VOICE_SERVICE_URL=http://localhost:8003
 Before deploying to fly.io, test your setup locally:
 
 ```bash
-# Navigate to the backend-services directory
-cd backend-services
+# Navigate to the backend directory
+cd backend
 
 # Build the Docker image
 docker build -t medical-chatbot .
@@ -125,8 +125,8 @@ Verify that all services start correctly and the API Gateway is accessible at ht
 Deploy the backend services first:
 
 ```bash
-# Navigate to the backend-services directory
-cd backend-services
+# Navigate to the backend directory
+cd backend
 
 # Launch the app (first-time deployment)
 flyctl launch --config fly.toml
@@ -142,7 +142,7 @@ Deploy the voice service worker:
 
 ```bash
 # Navigate to the voice-service directory
-cd backend-services/voice-service
+cd backend/voice-service
 
 # Launch the worker app
 flyctl launch --config fly.worker.toml

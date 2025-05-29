@@ -195,7 +195,10 @@ def register_user(email, password, first_name="Test", last_name="User"):
         "email": email,
         "password": password,
         "first_name": first_name,
-        "last_name": last_name
+        "last_name": last_name,
+        "preferences": {
+            "isVietnamese": True
+        }
     }
     response = requests.post(url, json=data)
     print("Register User Response:")
@@ -213,8 +216,8 @@ def run_tests():
         password = input("Enter your password: ")
 
     # Try to register first (this might fail if the user already exists)
-    # email = "register@test2.com"
-    # password = "Password123!"
+    email = "register@test.com"
+    password = "Password123!"
     # register_response = register_user(email, password)
 
     # Login
@@ -231,18 +234,18 @@ def run_tests():
     # get_conversations()
 
     # Create a conversation
-    create_response = create_conversation()
-    if create_response.status_code != 201:
-        print("Failed to create conversation. Exiting.")
-        return
+    # create_response = create_conversation()
+    # if create_response.status_code != 201:
+    #     print("Failed to create conversation. Exiting.")
+    #     return
 
-    conversation_id = create_response.json().get("id")
+    # conversation_id = create_response.json().get("id")
 
-    # Get the created conversation
-    get_conversation(conversation_id)
+    # # Get the created conversation
+    # get_conversation(conversation_id)
 
     # # Create a message
-    create_message(conversation_id)
+    # create_message(conversation_id)
 
     # # Get messages
     # get_messages(conversation_id)
@@ -266,18 +269,18 @@ def run_tests():
     #     print_response(delete_voice_response)
 
     # Delete test conversation
-    delete_response = requests.delete(
-        f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
-        headers={
-            "Authorization": f"Bearer {TOKEN}",
-            "X-API-Auth": f"Bearer {TOKEN}"
-        }
-    )
-    print(f"Delete Conversation Response:")
-    print_response(delete_response)
+    # delete_response = requests.delete(
+    #     f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
+    #     headers={
+    #         "Authorization": f"Bearer {TOKEN}",
+    #         "X-API-Auth": f"Bearer {TOKEN}"
+    #     }
+    # )
+    # print(f"Delete Conversation Response:")
+    # print_response(delete_response)
 
     # Get user profile
-    # get_user_profile()
+    get_user_profile()
 
 if __name__ == "__main__":
     run_tests()

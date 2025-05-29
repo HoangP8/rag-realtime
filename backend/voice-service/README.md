@@ -73,18 +73,11 @@ voice-service/
 ### Running the Service
 
 ```bash
-./scripts/run.sh
+./scripts/run_api.sh
+./scripts/run_agent.sh
 ```
 
 This will start both the FastAPI service and the LiveKit Agents worker.
-
-### Testing the Service
-
-```bash
-./scripts/test.sh
-```
-
-This will create a test session, get its details, and then delete it.
 
 ## API Endpoints
 
@@ -120,22 +113,14 @@ GET /api/v1/voice/session/{session_id}
 DELETE /api/v1/voice/session/{session_id}
 ```
 
-### WebSocket for Status Updates
-
-```
-WebSocket /api/v1/voice/ws/{session_id}
-```
-
 ## Environment Variables
 
 - `LIVEKIT_URL`: LiveKit server URL
 - `LIVEKIT_API_KEY`: LiveKit API key
 - `LIVEKIT_API_SECRET`: LiveKit API secret
 - `OPENAI_API_KEY`: OpenAI API key
-- `SUPABASE_URL`: Supabase URL
-- `SUPABASE_ANON_KEY`: Supabase anonymous key
-- `API_HOST`: API host (default: 0.0.0.0)
-- `API_PORT`: API port (default: 8003)
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase URL for frontend
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anonymous key for frontend
 
 ## License
 

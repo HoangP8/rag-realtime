@@ -6,17 +6,124 @@ This repository contains the backend services for the Medical Chatbot applicatio
 
 The backend is built using a microservices architecture with the following components:
 
-1. **API Gateway**: Central entry point for all client requests
-2. **Auth Service**: Handles user authentication and authorization
-3. **Conversation Service**: Manages conversations, messages, and LLM interactions
-4. **Voice Service**: Handles real-time voice communication via LiveKit and OpenAI Realtime API
+1. **API Gateway**: Central entry point for all client requests (Port 8000)
+2. **Auth Service**: Handles user authentication and authorization (Port 8001)
+3. **Conversation Service**: Manages conversations, messages, and LLM interactions (Port 8002)
+4. **Voice Service**: Handles real-time voice communication via LiveKit and OpenAI Realtime API (Port 8003)
+   - Voice API: Manages voice sessions and client connections
+   - LiveKit Agent Worker: Handles real-time speech-to-speech functionality
+
+## App Structure
+
+```
+backend/
+├── api-gateway/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── v1/
+│   │   │   │   ├── auth.py
+│   │   │   │   ├── conversations.py
+│   │   │   │   ├── profile.py
+│   │   │   │   └── voice.py
+│   │   │   └── router.py
+│   │   ├── core/
+│   │   │   ├── config.py
+│   │   │   ├── dependencies.py
+│   │   │   └── __init__.py
+│   │   ├── db/
+│   │   │   ├── __init__.py
+│   │   │   └── supabase.py
+│   │   ├── schemas/
+│   │   │   ├── auth.py
+│   │   │   ├── conversations.py
+│   │   │   ├── profile.py
+│   │   │   └── voice.py
+│   │   ├── services/
+│   │   │   ├── __init__.py
+│   │   │   ├── auth.py
+│   │   │   ├── conversations.py
+│   │   │   ├── profile.py
+│   │   │   └── voice.py
+│   │   └── main.py
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── auth-service/
+│   ├── app/
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   ├── service.py
+│   │   └── router.py
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── conversation-service/
+│   ├── app/
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   ├── llm.py
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   ├── service.py
+│   │   └── router.py
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── voice-service/
+│   ├── agent/
+│   │   ├── scripts/
+│   │   │   └── download_vectorstore.sh
+│   │   ├── text_benchmark.py
+│   │   ├── vectorstore.py
+│   │   ├── voice_benchmark.py
+│   │   ├── voce_benchmark.txt
+│   │   └── worker.py
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── routes.py
+│   │   │   └── __init__.py
+│   │   ├── services/
+│   │   │   ├── __init__.py
+│   │   │   ├── session.py
+│   │   │   └── storage.py
+│   │   ├── utils/
+│   │   │   └── livekit.py
+│   │   ├── config.py
+│   │   ├── models.py
+│   │   └── main.py
+│   ├── scripts/
+│   │   ├── run_api.sh
+│   │   └── run_agent.sh
+│   ├── Dockerfile
+│   ├── Dockerfile.worker
+│   ├── fly.worker.toml
+│   └── requirements.txt
+│
+├── database/
+│   └── schema.sql
+│
+├── .dockerignore
+├── .gitignore
+├── API_DOCUMENTATION.md
+├── API_TESTING.md
+├── DEPLOYMENT.md
+├── Dockerfile
+├── fly.toml
+├── README.md
+├── combined_service.py
+├── copy_env.py
+├── docker-compose.yml
+└── test_api.py
+```
 
 ## Technologies
 
 - **FastAPI**: Modern, high-performance web framework for building APIs
 - **Supabase**: PostgreSQL database, authentication, and storage
-- **LiveKit**: Real-time voice communication
-- **OpenAI**: GPT models for natural language processing
+- **LiveKit**: Real-time voice communication with WebRTC
+- **OpenAI**: GPT models for natural language processing and voice synthesis
 
 ## Getting Started
 
@@ -27,14 +134,15 @@ The backend is built using a microservices architecture with the following compo
 - Supabase account
 - OpenAI API key
 - LiveKit account
+- flyctl (for deployment to fly.io)
 
 ### Environment Setup
 
-Create a `.env` or `.env.local` file in the root directory with the following variables:
+Create a `.env.local` file in the root directory with the following variables:
 
-> **Note**: You can create a single `.env.local` file in the `backend-services` directory and run the `copy_env.py` script to copy it to all service directories:
+> **Note**: You can create a single `.env.local` file in the `backend` directory and run the `copy_env.py` script to copy it to all service directories:
 > ```bash
-> cd backend-services
+> cd backend
 > python copy_env.py
 > ```
 
@@ -70,7 +178,7 @@ RABBITMQ_VHOST=/
 ### Running Locally
 
 1. Install dependencies for each service:
-   ```
+   ```bash
    cd api-gateway && pip install -r requirements.txt
    cd ../auth-service && pip install -r requirements.txt
    cd ../conversation-service && pip install -r requirements.txt
@@ -78,19 +186,32 @@ RABBITMQ_VHOST=/
    ```
 
 2. Run each service in a separate terminal:
-   ```
+   ```bash
    cd api-gateway && uvicorn app.main:app --reload --port 8000
    cd auth-service && uvicorn app.main:app --reload --port 8001
    cd conversation-service && uvicorn app.main:app --reload --port 8002
    cd voice-service && uvicorn app.main:app --reload --port 8003
    ```
 
+3. For the voice service, also run the LiveKit agent worker:
+   ```bash
+   cd voice-service && bash scripts/run_agent.sh
+   ```
+
 ### Running with Docker
 
-To run all services using Docker Compose:
+For local testing with Docker:
 
-```
-docker-compose up --build
+```bash
+# Build and run the main backend services
+cd backend
+docker build -t medical-chatbot .
+docker run -p 8000:8000 --env-file .env.local medical-chatbot
+
+# Build and run the voice service worker
+cd voice-service
+docker build -t worker-agent -f Dockerfile.worker .
+docker run --env-file .env.local worker-agent
 ```
 
 ## API Documentation
@@ -101,64 +222,6 @@ Once the services are running, you can access the API documentation at:
 - Auth Service: `http://localhost:8001/docs`
 - Conversation Service: `http://localhost:8002/docs`
 - Voice Service: `http://localhost:8003/docs`
-
-## Troubleshooting
-
-### Common Issues
-
-1. **RabbitMQ Connection Error**:
-   - Make sure RabbitMQ is running: `docker ps | grep rabbitmq`
-   - Check RabbitMQ logs: `docker logs rabbitmq`
-   - Verify connection settings in `.env` file
-
-2. **LiveKit Connection Error**:
-   - Verify LiveKit server is running
-   - Check LiveKit API key and secret in `.env` file
-   - Ensure the token is valid and not expired
-
-3. **WebSocket Connection Error**:
-   - Make sure the session ID is valid
-   - Check that the voice service is running
-   - Verify the WebSocket URL is correct
-
-### Testing with cURL
-
-```bash
-# Create a voice session
-curl -X POST http://localhost:8000/api/v1/voice/session/create \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"metadata": {"instructions": "You are a medical assistant. Help the user with their medical questions."}}'
-
-# Get session status
-curl -X GET http://localhost:8000/api/v1/voice/session/SESSION_ID/status \
-  -H "Authorization: Bearer YOUR_TOKEN"
-
-# Delete session
-curl -X DELETE http://localhost:8000/api/v1/voice/session/SESSION_ID \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-### Testing with WebSocket Client
-
-You can use tools like [websocat](https://github.com/vi/websocat) or [wscat](https://github.com/websockets/wscat) to test WebSocket connections:
-
-```bash
-# Install wscat
-npm install -g wscat
-
-# Connect to WebSocket endpoint
-wscat -c "ws://localhost:8000/api/v1/realtime/ws/SESSION_ID"
-
-# Send control message to start conversation
-{"type":"control","action":"start"}
-
-# Send text message
-{"type":"text","text":"Hello, how are you?"}
-
-# Send control message to stop conversation
-{"type":"control","action":"stop"}
-```
 
 ## Database Schema
 
@@ -187,70 +250,32 @@ The Conversation Service manages conversations, messages, and LLM interactions. 
 
 ### Voice Service
 
-The Voice Service handles real-time voice communication using LiveKit WebRTC integration and an event-driven architecture with RabbitMQ. It provides endpoints for creating and managing voice sessions, as well as real-time speech-to-speech capabilities.
+The Voice Service handles real-time voice communication using LiveKit WebRTC integration. It consists of two main components:
 
-#### Running the Voice Service
+1. **Voice API**: FastAPI service that manages voice sessions and provides WebSocket connections
+2. **LiveKit Agent Worker**: Handles real-time speech-to-speech functionality using OpenAI's Realtime API
 
-To run just the voice service for testing:
+#### Voice Service Features
 
-```bash
-chmod +x run_voice_service.sh
-./run_voice_service.sh
-```
-
-This script will:
-1. Start RabbitMQ in a Docker container if it's not already running
-2. Create a Python virtual environment if it doesn't exist
-3. Install dependencies
-4. Start the voice service on port 8003
-
-#### Testing Voice Mode
-
-The service includes several test scripts to help you test the voice mode without a frontend application:
-
-##### 1. Testing Session Management
-
-Use the `test_voice_session.sh` script to create, check, and delete voice sessions:
-
-```bash
-cd voice-service
-chmod +x scripts/test_voice_session.sh
-./scripts/test_voice_session.sh
-```
-
-Before running, edit the script to set your API URL and authentication token.
-
-##### 2. Testing WebSocket Communication
-
-Use the `test_voice_websocket.py` script to test real-time communication via WebSocket:
-
-```bash
-cd voice-service
-python scripts/test_voice_websocket.py <session-id> --url ws://localhost:8000
-```
-
-Replace `<session-id>` with the session ID obtained from the session creation API.
-
-##### 3. Testing LiveKit Connection
-
-Use the `test_livekit_connection.py` script to test the LiveKit WebRTC connection:
-
-```bash
-cd voice-service
-python scripts/test_livekit_connection.py <token> --url wss://your-livekit-server
-```
-
-Replace `<token>` with the token obtained from the session creation API and update the LiveKit server URL.
+- Real-time speech-to-speech communication
+- Automatic transcription of conversations
+- Storage of conversation history
+- Multiple concurrent voice sessions
+- WebSocket status updates
 
 #### Voice Mode API Endpoints
 
-- **Create Session**: `POST /api/v1/voice/session/create`
+- **Create Session**: `POST /api/v1/voice/session`
   ```json
   {
     "conversation_id": "optional-uuid",
-    "metadata": {
-      "instructions": "You are a medical assistant. Help the user with their medical questions."
-    }
+    "instructions": "You are a medical assistant. Help the user with their medical questions.",
+    "voice_settings": {
+      "voice_id": "alloy",
+      "temperature": 0.8,
+      "max_output_tokens": 2048
+    },
+    "metadata": {}
   }
   ```
 
@@ -262,8 +287,6 @@ Replace `<token>` with the token obtained from the session creation API and upda
 
 - **Delete Session**: `DELETE /api/v1/voice/session/{session_id}`
 
-- **WebSocket**: `ws://localhost:8000/api/v1/realtime/ws/{session_id}`
-
   Messages to send:
   ```json
   {"type":"control","action":"start"}
@@ -272,23 +295,67 @@ Replace `<token>` with the token obtained from the session creation API and upda
   {"type":"control","action":"stop"}
   ```
 
+## Testing
+
+### Testing with cURL
+
+```bash
+# Create a voice session
+curl -X POST http://localhost:8000/api/v1/voice/session \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"instructions": "You are a medical assistant. Help the user with their medical questions."}'
+
+# Get session status
+curl -X GET http://localhost:8000/api/v1/voice/session/SESSION_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Delete session
+curl -X DELETE http://localhost:8000/api/v1/voice/session/SESSION_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **LiveKit Connection Error**:
+   - Verify LiveKit server is running
+   - Check LiveKit API key and secret in `.env.local` file
+   - Ensure the token is valid and not expired
+
+3. **Voice Service Issues**:
+   - Ensure both the API and worker components are running
+   - Check LiveKit credentials are correctly set
+   - Verify OpenAI API key has access to Realtime API
+
 ## Deployment
 
 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Quick Deployment to fly.io
 
+The application is deployed as two separate fly.io apps:
+
+1. **Main Backend Services** (`medbot-backend`): API Gateway, Auth, Conversation, and Voice API
+2. **Voice Agent Worker** (`medbot-agent`): LiveKit agent for real-time voice processing
+
 ```bash
-# Navigate to the backend-services directory
-cd backend-services
+# Navigate to the backend directory
+cd backend
 
-# Set up secrets (replace with your actual values)
-flyctl secrets set NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-flyctl secrets set NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-flyctl secrets set OPENAI_API_KEY=your_openai_api_key
+# Deploy main backend services
+flyctl launch --config fly.toml
+# Set the secrets
+cat .env.local | tr '\n' ' ' | xargs flyctl secrets set
+# For subsequent deployments
+flyctl deploy --config fly.toml
 
-# Deploy the application
-flyctl deploy
+# Deploy voice agent worker
+cd voice-service
+flyctl launch --config fly.worker.toml
+# Set the secrets
+cat .env.local | tr '\n' ' ' | xargs flyctl -a medbot-agent secrets set
+# For subsequent deployments
+flyctl deploy --config fly.worker.toml
 ```
-
-This will deploy all services to a single fly.io instance for cost efficiency during the trial phase.
