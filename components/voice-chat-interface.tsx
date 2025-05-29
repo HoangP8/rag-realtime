@@ -39,12 +39,25 @@ export default function VoiceChatInterface({ conversationId }: VoiceChatInterfac
   const [agentState, setAgentState] = useState<AgentState>("disconnected")
   const [userAuthenticated, setUserAuthenticated] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
+  // Add these state variables to track voice session content
+  const [voiceSessionMessages, setVoiceSessionMessages] = useState<Array<{
+    role: 'user' | 'assistant',
+    content: string,
+    timestamp: Date
+  }>>([])
+  const [showTextMessages, setShowTextMessages] = useState(false)
 
   // Check authentication status
   useEffect(() => {
     const checkAuth = () => {
       const authenticated = isAuthenticated()
+      console.log('Authentication check:', authenticated)
       setUserAuthenticated(authenticated)
+      
+      // If token exists but is invalid, show a more specific message
+      if (!authenticated && localStorage.getItem('access_token')) {
+        toast.error('Your session has expired. Please log in again.')
+      }
     }
 
     checkAuth()
@@ -82,10 +95,19 @@ export default function VoiceChatInterface({ conversationId }: VoiceChatInterfac
         }
       })
 
+      console.log('Voice session response:', voiceSessionResponse)
+      
+      if (!voiceSessionResponse || !voiceSessionResponse.token) {
+        throw new Error('Invalid response from voice session API')
+      }
+
+      // Make sure to use the correct LiveKit URL from environment variables
+      const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://clinical-chatbot-1dewlazs.livekit.cloud';
+
       // Update connection details with the voice session response
       updateConnectionDetails({
         participantToken: voiceSessionResponse.token,
-        serverUrl: process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://medbot-livekit.livekit.cloud',
+        serverUrl: serverUrl, // Use the variable defined above
         participantName: voiceSessionResponse.user_id,
         roomName: `voice-session-${targetConversationId}`
       })
@@ -93,7 +115,7 @@ export default function VoiceChatInterface({ conversationId }: VoiceChatInterfac
       console.log('Voice session created successfully')
     } catch (error) {
       console.error('Failed to create voice session:', error)
-      toast.error('Failed to connect to voice session')
+      toast.error('Failed to connect to voice session: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setIsConnecting(false)
     }
@@ -105,6 +127,23 @@ export default function VoiceChatInterface({ conversationId }: VoiceChatInterfac
       "Error acquiring camera or microphone permissions. Please make sure you grant the necessary permissions in your browser and reload the tab"
     )
   }, [])
+
+  // Add this function to handle session end
+  const handleVoiceSessionEnd = useCallback(() => {
+    // Reset connection details to end the LiveKit session
+    updateConnectionDetails(undefined)
+    // Show the text message view with the voice session content
+    setShowTextMessages(true)
+  }, [])
+
+  // Add a function to handle transcriptions
+  const handleTranscription = useCallback((text: string, role: 'user' | 'assistant') => {
+    setVoiceSessionMessages(prev => [...prev, {
+      role,
+      content: text,
+      timestamp: new Date()
+    }]);
+  }, []);
 
   if (connectionDetails) {
     return (
@@ -124,9 +163,13 @@ export default function VoiceChatInterface({ conversationId }: VoiceChatInterfac
           }}
           className="grid grid-rows-[2fr_1fr] items-center"
         >
-          <SimpleVoiceAssistant onStateChange={setAgentState} />
+          <SimpleVoiceAssistant 
+            onStateChange={setAgentState} 
+            onTranscription={handleTranscription}
+          />
           <ControlBar
             onConnectButtonClicked={onConnectButtonClicked}
+            onEndSession={handleVoiceSessionEnd}
             agentState={agentState}
           />
           <RoomAudioRenderer />
@@ -134,6 +177,47 @@ export default function VoiceChatInterface({ conversationId }: VoiceChatInterfac
         </LiveKitRoom>
       </main>
     )
+  }
+
+  // Add the text message view after voice session ends
+  if (showTextMessages && voiceSessionMessages.length > 0) {
+    return (
+      <div className="h-full flex flex-col bg-gray-50 p-4">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Voice Session Transcript</h2>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowTextMessages(false)}
+          >
+            New Session
+          </Button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto space-y-4 p-2">
+          {voiceSessionMessages.map((msg, idx) => (
+            <div 
+              key={idx} 
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div 
+                className={`max-w-[80%] rounded-lg p-3 ${
+                  msg.role === 'user' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-100 text-gray-900'
+                }`}
+              >
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <p className={`text-xs mt-1 ${
+                  msg.role === 'user' ? 'text-blue-100' : 'text-gray-500'
+                }`}>
+                  {msg.timestamp.toLocaleTimeString()}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -237,11 +321,29 @@ export default function VoiceChatInterface({ conversationId }: VoiceChatInterfac
 
 function SimpleVoiceAssistant(props: {
   onStateChange: (state: AgentState) => void;
+  onTranscription?: (text: string, role: 'user' | 'assistant') => void;
 }) {
   const { state, audioTrack } = useVoiceAssistant();
+  
   useEffect(() => {
     props.onStateChange(state);
   }, [props, state]);
+  
+  // Add transcription listener
+  useEffect(() => {
+    const handleTranscription = (event: any) => {
+      if (event.detail?.text && event.detail?.isFinal) {
+        const role = event.detail.isUser ? 'user' : 'assistant';
+        props.onTranscription?.(event.detail.text, role);
+      }
+    };
+    
+    document.addEventListener('lk-transcription', handleTranscription);
+    return () => {
+      document.removeEventListener('lk-transcription', handleTranscription);
+    };
+  }, [props]);
+  
   return (
     <div className="h-[300px] max-w-[90vw] mx-auto">
       <BarVisualizer
@@ -257,9 +359,9 @@ function SimpleVoiceAssistant(props: {
 
 function ControlBar(props: {
   onConnectButtonClicked: () => void;
+  onEndSession: () => void;
   agentState: AgentState;
 }) {
-
   return (
     <div className="relative h-[100px]">
       <AnimatePresence>
@@ -270,10 +372,10 @@ function ControlBar(props: {
               animate={{ opacity: 1, top: 0 }}
               exit={{ opacity: 0, top: "-10px" }}
               transition={{ duration: 0.4, ease: [0.09, 1.04, 0.245, 1.055] }}
-              className="flex h-8 absolute left-1/2 -translate-x-1/2  justify-center"
+              className="flex h-8 absolute left-1/2 -translate-x-1/2 justify-center"
             >
               <VoiceAssistantControlBar controls={{ leave: false }} />
-              <DisconnectButton>
+              <DisconnectButton onClick={props.onEndSession}>
                 <CloseIcon />
               </DisconnectButton>
             </motion.div>

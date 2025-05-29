@@ -56,7 +56,17 @@ export default function MedicalChatbot() {
     }
   }
 
+  // Add a flag to prevent multiple calls
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+
   const handleStartNewConversation = async () => {
+    // Add a flag to prevent multiple calls
+    if (isCreatingConversation) {
+      console.log('Already creating a conversation, ignoring duplicate call');
+      return;
+    }
+    
+    setIsCreatingConversation(true);
     console.log('🚀 Starting new conversation...')
 
     try {
@@ -72,6 +82,9 @@ export default function MedicalChatbot() {
     } catch (error) {
       console.error('❌ Failed to create conversation:', error)
       toast.error('Failed to start new conversation. Please try again.')
+    } finally {
+      // Reset the flag
+      setIsCreatingConversation(false);
     }
   }
 

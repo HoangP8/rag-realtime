@@ -257,4 +257,60 @@ export class VoiceSessionAPI {
       )
     }
   }
+
+  static async saveVoiceTranscription(conversationId: string, messages: Array<{
+    role: 'user' | 'assistant',
+    content: string,
+    timestamp: Date
+  }>): Promise<boolean> {
+    try {
+      if (!isAuthenticated()) {
+        throw new VoiceSessionError(
+          'AUTHENTICATION_REQUIRED',
+          'User is not authenticated or token is expired'
+        )
+      }
+
+      const backendUrl = this.getBackendUrl()
+      const url = `${backendUrl}/api/v1/conversations/${conversationId}/messages/batch`
+      
+      // Format messages for the API
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        message_type: "voice_transcription",
+        metadata: {
+          timestamp: msg.timestamp.toISOString(),
+          source: "livekit_transcription"
+        }
+      }));
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ messages: formattedMessages }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new VoiceSessionError(
+          data.error_code || 'SAVE_TRANSCRIPTION_FAILED',
+          data.message || data.error || "Failed to save voice transcription",
+          data.details
+        )
+      }
+
+      return true
+    } catch (error) {
+      console.error("Save voice transcription error:", error)
+      if (error instanceof VoiceSessionError) {
+        throw error
+      }
+      throw new VoiceSessionError(
+        'NETWORK_ERROR',
+        error instanceof Error ? error.message : "Network error occurred",
+        { originalError: error }
+      )
+    }
+  }
 }

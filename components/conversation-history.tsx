@@ -1,15 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Search,
   Library,
   Clock,
-  MoreHorizontal,
 } from "lucide-react"
-import { useRouter } from "next/navigation"
 
 interface Conversation {
   id: string
@@ -28,61 +26,46 @@ interface ConversationHistoryProps {
 export default function ConversationHistory({ onConversationSelect, activeConversation }: ConversationHistoryProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [conversations, setConversations] = useState<Conversation[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
 
-  const handleConversationClick = (conversation: Conversation) => {
+  const handleConversationClick = useCallback((conversation: Conversation) => {
     if (onConversationSelect) {
-      onConversationSelect(conversation)
+      onConversationSelect(conversation.id);
     }
-    router.push(`/chat/${conversation.id}`)
-  }
+  }, [onConversationSelect]);
 
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        setLoading(true)
         // Get token from localStorage
         const access_token = localStorage.getItem("access_token")
-        
+
         if (!access_token) {
-          setError("Not authenticated")
-          setLoading(false)
+          console.warn("Not authenticated")
           return
         }
 
         const response = await fetch("https://medbot-backend.fly.dev/api/v1/conversations/", {
           headers: {
             "Authorization": `Bearer ${access_token}`,
-            "X-API-Auth": `Bearer ${access_token}` 
+            "X-API-Auth": `Bearer ${access_token}`
           }
         })
 
         if (!response.ok) {
-          console.log("Response Fail")
           throw new Error(`Failed to fetch conversations: ${response.status}`)
-        }
-        else 
-        {
-          console.log("Response: OK")
         }
 
         const data = await response.json()
-        
+
         // Add preview field for compatibility with existing code
         const conversationsWithPreview = data.map((conv: Conversation) => ({
           ...conv,
           preview: conv.metadata?.lastMessage || "No messages yet..."
         }))
-        
+
         setConversations(conversationsWithPreview)
-        setError(null)
       } catch (err) {
         console.error("Error fetching conversations:", err)
-        setError(err instanceof Error ? err.message : "Failed to load conversations")
-      } finally {
-        setLoading(false)
       }
     }
 
@@ -121,7 +104,7 @@ export default function ConversationHistory({ onConversationSelect, activeConver
   const filteredConversations = conversations.filter(
     (conv) =>
       conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.preview.toLowerCase().includes(searchQuery.toLowerCase()),
+      (conv.preview && conv.preview.toLowerCase().includes(searchQuery.toLowerCase())),
   )
 
   const groupedConversations = groupConversationsByTime(filteredConversations)
@@ -139,8 +122,9 @@ export default function ConversationHistory({ onConversationSelect, activeConver
     return `${days}d ago`
   }
 
+  // Make sure the click handler is properly connected to the UI elements
   const ConversationGroup = ({ title, conversations }: { title: string; conversations: Conversation[] }) => {
-    if (conversations.length === 0) return null
+    if (conversations.length === 0) return null;
 
     return (
       <div className="mb-4">
@@ -150,31 +134,25 @@ export default function ConversationHistory({ onConversationSelect, activeConver
             <div
               key={conv.id}
               onClick={() => handleConversationClick(conv)}
-              className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors group ${
+              className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer ${
                 activeConversation === conv.id ? "bg-gray-100" : ""
               }`}
             >
               <div className="flex items-start justify-between">
-                <div
-                  className="flex-1 min-w-0"
-                  onClick={() => onConversationSelect(conv.id)}
-                >
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{conv.title}</p>
                   <p className="text-xs text-gray-500 truncate mt-1">{conv.preview}</p>
                 </div>
-                <div className="flex items-center space-x-1 ml-2">
+                <div className="flex items-center ml-2">
                   <span className="text-xs text-gray-400">{formatTime(conv.updated_at)}</span>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0">
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
                 </div>
               </div>
             </div>
           ))}
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   return (
     <div className="flex flex-col h-full">

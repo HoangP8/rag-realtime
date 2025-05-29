@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { LogOut, Stethoscope } from "lucide-react"
 import MainFrame from "@/components/main-frame"
 import ConversationHistory from "@/components/conversation-history"
+import { useState, useCallback } from 'react'
 
 interface StartingPageProps {
   currentUser: any
@@ -16,6 +17,36 @@ export default function StartingPage({
   onLogout,
   onStartNewConversation
 }: StartingPageProps) {
+  // Add state to track if navigation is in progress
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  // Create a handler for conversation selection
+  const handleConversationSelect = useCallback((conversationId: string) => {
+    console.log("Conversation selected in StartingPage:", conversationId);
+    
+    // Prevent multiple rapid navigations
+    if (isNavigating) {
+      console.log("Navigation already in progress, ignoring");
+      return;
+    }
+    
+    if (conversationId) {
+      setIsNavigating(true);
+      console.log("Navigating to conversation:", conversationId);
+      
+      // IMPORTANT: Do NOT call onStartNewConversation here
+      // Just navigate directly to the existing conversation
+      window.location.href = `/chat/${conversationId}`;
+      
+      // Reset navigation flag after a delay (in case navigation fails)
+      setTimeout(() => setIsNavigating(false), 2000);
+    } else {
+      // Only create a new conversation if no ID was provided
+      console.log("No conversation ID provided, creating new conversation");
+      onStartNewConversation();
+    }
+  }, [onStartNewConversation, isNavigating]);
+
   return (
     <div className="flex h-screen bg-white">
       {/* Left Sidebar */}
@@ -29,7 +60,10 @@ export default function StartingPage({
             <span className="font-semibold text-gray-900">Medical AI</span>
           </div>
           <Button
-            onClick={onStartNewConversation}
+            onClick={() => {
+              console.log("New Consultation button clicked");
+              onStartNewConversation();
+            }}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white"
           >
             New Consultation
@@ -39,7 +73,7 @@ export default function StartingPage({
         {/* Conversation History */}
         <div className="flex-1 overflow-hidden">
           <ConversationHistory
-            onConversationSelect={onStartNewConversation}
+            onConversationSelect={handleConversationSelect}
             activeConversation={null}
           />
         </div>

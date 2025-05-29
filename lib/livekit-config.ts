@@ -1,7 +1,8 @@
 import { LivekitConfig, AudioSettings } from '@/types/voice'
 
 export const LIVEKIT_CONFIG: LivekitConfig = {
-  url: process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://medbot-livekit.livekit.cloud',
+  // Use the correct URL from your environment variables
+  url: process.env.LIVEKIT_URL || 'wss://clinical-chatbot-1dewlazs.livekit.cloud',
   apiKey: process.env.LIVEKIT_API_KEY || '',
   apiSecret: process.env.LIVEKIT_API_SECRET || '',
 }
