@@ -280,10 +280,6 @@ def get_user_active_chat_history(auth_token: str, user_id: str = "user_test_123"
 
     if user_id == "user_test_123" or not messages: # Get dummy history 
         # Pre-create messages to avoid repeated object creation
-        # dummy_history = [
-        #     {"role": "user", "content": "Tôi tên là Hoàng, hãy gọi tên tôi mỗi khi bạn nói chuyện với tôi."},
-        #     {"role": "user", "content": "Dạo này tôi bị đau đầu và căng thẳng trong công việc. Tôi cần được hỗ trợ về sức khỏe và tâm lý."}, 
-        # ]
         dummy_history = [
             {"role": "user", "content": "Tôi tên là Hoàng, hãy bắt đầu gợi ý các câu hỏi về sức khỏe và tâm lý của tôi."},
         ]

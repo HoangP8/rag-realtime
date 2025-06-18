@@ -10,7 +10,7 @@ from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai, deepgram, silero
 
 # Load environment variables
-load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env.local")
+load_dotenv(dotenv_path=Path(__file__).parent.parent.parent.parent / ".env.local")
 AGENT_TYPE = "voice_pipeline"  # "voice_pipeline" or "multimodal"
 
 # Set up logging
