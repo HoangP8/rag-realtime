@@ -37,6 +37,27 @@ class StorageService:
     def get_user(self, token: str):
         return self.client.auth.get_user(token)
     
+    async def get_user_preferences(self, user_id: UUID, auth_token: str) -> Dict[str, Any]:
+        """Get user preferences from the database"""
+        try:
+            # Set auth token
+            self.set_auth_token(auth_token)
+            
+            # Get user profile from database
+            response = self.client.table("user_profiles") \
+                .select("preferences") \
+                .eq("id", str(user_id)) \
+                .execute()
+            
+            if not response.data:
+                return {}
+            
+            return response.data[0].get("preferences", {})
+        
+        except Exception as e:
+            logger.error(f"Error getting user preferences: {str(e)}")
+            return {}
+    
     def _serialize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Convert Python objects to JSON-serializable types"""
         serialized = {}
@@ -135,18 +156,29 @@ class StorageService:
             logger.error(f"Error storing transcription: {str(e)}")
             raise
 
-    def get_conversation_history(self, user_id: UUID, conversation_id: UUID, auth_token: str) -> List[Dict[str, Any]]:
+    def get_conversation_history(
+        self, 
+        user_id: UUID, 
+        conversation_id: UUID, 
+        auth_token: str,
+        since_timestamp: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
         """Get the conversation history for a voice session"""
         try:
             # Set auth token
             self.set_auth_token(auth_token)
             
-            # Get conversation history from database
-            response = self.client.table("messages") \
+            # Build query
+            query = self.client.table("messages") \
                 .select("*") \
-                .eq("conversation_id", str(conversation_id)) \
-                .order("created_at") \
-                .execute()
+                .eq("conversation_id", str(conversation_id))
+            
+            # Add timestamp filter if provided
+            if since_timestamp:
+                query = query.gt("created_at", since_timestamp.isoformat())
+            
+            # Execute query and order results
+            response = query.order("created_at").execute()
             
             # Convert to response models
             messages = []
@@ -158,3 +190,17 @@ class StorageService:
         except Exception as e:
             logger.error(f"Error getting conversation history: {str(e)}")
             raise
+
+    def get_messages_since(
+        self,
+        conversation_id: UUID,
+        auth_token: str,
+        since_timestamp: datetime
+    ) -> List[Dict[str, Any]]:
+        """Get messages since a specific timestamp"""
+        return self.get_conversation_history(
+            user_id=None,  # Not needed for this query
+            conversation_id=conversation_id,
+            auth_token=auth_token,
+            since_timestamp=since_timestamp
+        )

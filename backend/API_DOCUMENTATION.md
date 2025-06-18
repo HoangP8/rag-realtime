@@ -398,14 +398,13 @@ To obtain a token, use the login endpoint. The token will be valid for a limited
 ```json
 {
   "conversation_id": "123e4567-e89b-12d3-a456-426614174000",
-  "instructions": "You are a medical assistant. Help the user with their medical questions. Be empathetic and provide clear, helpful information.",
-  "voice_settings": {
-    "voice_id": "alloy",
-    "temperature": 0.8,
-    "max_output_tokens": 2048
-  },
   "metadata": {
-    "session_type": "consultation"
+    "voice_settings": {
+      "voice_id": "alloy",
+      "temperature": 0.8,
+      "max_output_tokens": 2048
+    },
+    "use_rag": true,
   }
 }
 ```

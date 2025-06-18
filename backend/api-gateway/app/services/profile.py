@@ -75,6 +75,8 @@ class ProfileService:
                 update_data["last_name"] = data.last_name
             if data.date_of_birth is not None:
                 update_data["date_of_birth"] = data.date_of_birth
+            if data.preferences is not None:
+                update_data["preferences"] = data.preferences
 
             # Call auth service API
             async with httpx.AsyncClient() as client:

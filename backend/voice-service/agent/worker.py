@@ -102,46 +102,30 @@ def load_vectorstore(model_name: str, chunk_size: int = 1024) -> tuple[FAISS, Op
 class MedicalFunctionContext(llm.FunctionContext):
     """Function context for RAG capabilities following LiveKit best practices."""
 
-    def __init__(self, vectorstore: FAISS):
+    def __init__(self, vectorstore: FAISS, user_preferences: dict = None, use_rag: bool = True):
         super().__init__()
         self.vectorstore = vectorstore
-        self.current_language = "vi"  # Default to Vietnamese
-
-    @llm.ai_callable()
-    async def detect_user_language(
-        self,
-        text: Annotated[str, llm.TypeInfo(description="User's text to analyze for language detection")],
-    ) -> str:
-        """
-        Detect user language and set it for the session.
-        """
-        lang, confidence = langid.classify(text)
-        
-        # Check for Vietnamese characters
-        has_vietnamese = any(char in text.lower() for char in 'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ')
-        
-        if has_vietnamese or (lang == "vi" and confidence > 0.5):
-            self.current_language = "vi"
-        else:
-            self.current_language = "en"
-            
-        log_event("Language Detection", f"Detected: {self.current_language}")
-        return self.current_language
+        self.use_rag = use_rag
+        # Set language based on user preferences, default to Vietnamese if not specified
+        self.current_language = "vi" if user_preferences.get("isVietnamese", True) else "en"
 
     @llm.ai_callable()
     async def rag_medical_search(
         self,
         query: Annotated[str, llm.TypeInfo(description="Medical question to search for in the knowledge base")],
-        num_results: Annotated[int, llm.TypeInfo(description="Number of documents to retrieve")] = 3,
+        num_results: Annotated[int, llm.TypeInfo(description="Number of documents to retrieve")] = 1,
     ) -> str:
         """
         Search medical knowledge base for relevant information.
         """
+        if not self.use_rag:
+            return ""
+        
         search_start = time.time()
         
         # Perform similarity search
-        filtered_docs = self.vectorstore.similarity_search_with_relevance_scores(
-            query, k=num_results, score_threshold=0.35
+        filtered_docs = self.vectorstore.similarity_search(
+            query, k=num_results
         )
 
         if not filtered_docs:
@@ -184,7 +168,7 @@ class MedicalMultimodalAgent(MultimodalAgent):
         2. Follow EXACTLY the RAG information provided below if it DIRECTLY answers the user's question.  If not, rely on your general knowledge instead.
     
     LANGUAGE AND STYLE:
-        1. Call detect_user_language() to identify user's language if you're unsure
+        1. Use the current_language property to determine the language to respond in (should be in either Vietnamese or English).
         2. ONLY Vietnamese and English
         3. Respond in Vietnamese if user speaks Vietnamese.
         4. Respond in English if user speaks English.
@@ -197,13 +181,18 @@ class MedicalMultimodalAgent(MultimodalAgent):
         *,
         model: openai.realtime.RealtimeModel,
         vectorstore: FAISS,
+        user_preferences: dict,
+        use_rag: bool = True,
         vad: Optional[Any] = None,
         transcription: AgentTranscriptionOptions = AgentTranscriptionOptions(),
         loop: Optional[asyncio.AbstractEventLoop] = None,
         chat_ctx: Optional[llm.ChatContext] = None,
     ):
         # Initialize RAG function context
-        self.med_fnc_ctx = MedicalFunctionContext(vectorstore=vectorstore)
+        self.med_fnc_ctx = MedicalFunctionContext(vectorstore=vectorstore, user_preferences=user_preferences, use_rag=use_rag)
+        self.chat_ctx = chat_ctx  # Store chat context in instance
+        self.last_message_timestamp = None  # Track last message timestamp
+        self.storage_service = StorageService()  # Initialize storage service
 
         super().__init__(
             model=model,
@@ -268,7 +257,33 @@ class MedicalMultimodalAgent(MultimodalAgent):
         
         @self.on("agent_speech_committed")
         def on_agent_speech_committed(response):
-            log_event("ASSISTANT RESPONSE", f"{response}\n\n")    
+            log_event("ASSISTANT RESPONSE", f"{response}\n\n")
+
+    async def update_chat_history(self, user_id: str, conversation_id: str, auth_token: str):
+        """Update chat history with new messages only."""
+        try:
+            # Get new messages since last update
+            new_messages = self.storage_service.get_messages_since(
+                conversation_id=conversation_id,
+                auth_token=auth_token,
+                since_timestamp=self.last_message_timestamp
+            ) if self.last_message_timestamp else self.storage_service.get_conversation_history(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                auth_token=auth_token
+            )
+
+            if new_messages:
+                # Update last message timestamp
+                self.last_message_timestamp = new_messages[-1].created_at
+                
+                # Convert to chat messages and add to context
+                chat_messages = [llm.ChatMessage(role=msg.role, content=msg.content) for msg in new_messages]
+                self.chat_ctx.messages.extend(chat_messages)
+                
+                log_event("Chat History Update", f"Added {len(chat_messages)} new messages")
+        except Exception as e:
+            logger.error(f"Error updating chat history: {str(e)}")
 
 
 def get_user_active_chat_history(auth_token: str, user_id: str = "user_test_123", conversation_id: str = "conversation_test_123") -> Optional[llm.ChatContext]:
@@ -280,12 +295,11 @@ def get_user_active_chat_history(auth_token: str, user_id: str = "user_test_123"
 
     if user_id == "user_test_123" or not messages: # Get dummy history 
         # Pre-create messages to avoid repeated object creation
-        # dummy_history = [
-        #     {"role": "user", "content": "Tôi tên là Hoàng, hãy gọi tên tôi mỗi khi bạn nói chuyện với tôi."},
-        #     {"role": "user", "content": "Dạo này tôi bị đau đầu và căng thẳng trong công việc. Tôi cần được hỗ trợ về sức khỏe và tâm lý."}, 
-        # ]
         dummy_history = [
-            {"role": "user", "content": "Tôi tên là Hoàng, hãy bắt đầu gợi ý các câu hỏi về sức khỏe và tâm lý của tôi."},
+            {"role": "system", 
+            "content": "Bạn là một bác sĩ chuyên ngành nội khoa. Bạn có thể hỏi tên, nhu cầu của người dùng, và bắt đầu gợi ý các câu hỏi về sức khỏe và tâm lý."},
+            {"role": "user", 
+            "content": "Xin chào"},
         ]
         messages = [llm.ChatMessage(role=item["role"], content=item["content"]) for item in dummy_history]
     
@@ -345,8 +359,32 @@ async def entrypoint(ctx: JobContext):
     # Load initial chat context
     chat_ctx = get_user_active_chat_history(auth_token, user_id, conversation_id)
 
-    # Initialize the assistant
-    assistant = MedicalMultimodalAgent(model=model, chat_ctx=chat_ctx, vectorstore=vectorstore)
+    # Extract user preferences from metadata
+    user_preferences = agent_metadata.get("preferences", {})
+    # Get use_rag flag from metadata, default to True if not specified
+    use_rag = agent_metadata.get("use_rag", True)
+    
+    # Initialize the assistant with user preferences
+    assistant = MedicalMultimodalAgent(
+        model=model, 
+        chat_ctx=chat_ctx, 
+        vectorstore=vectorstore,
+        user_preferences=user_preferences,
+        use_rag=use_rag
+    )
+    
+    # Setup background task to periodically update chat history
+    async def update_history_periodically():
+        while True:
+            logger.info(f"AGENT METADATA: {agent_metadata}") # TODO: Test what is agent_metadata
+            logger.info(f"USER PREFERENCES: {user_preferences}") # TODO: Test what is agent_metadata
+            logger.info(f"USE RAG: {use_rag}") # TODO: Test what is agent_metadata
+            await assistant.update_chat_history(user_id, conversation_id, auth_token)
+            await asyncio.sleep(30)  # Update every 30 seconds
+    
+    # Start background task
+    asyncio.create_task(update_history_periodically())
+    
     assistant.start(ctx.room, participant)
 
 if __name__ == "__main__":

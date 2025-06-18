@@ -11,6 +11,7 @@ from uuid import UUID
 from app.config import settings
 from app.models import VoiceSession, VoiceSettings
 from app.utils.livekit import create_session, delete_room, create_livekit_client
+from app.services.storage import StorageService
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,8 @@ class SessionService:
         instructions: Optional[str] = None,
         voice_settings: Optional[VoiceSettings] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        auth_token: Optional[str] = None
+        auth_token: Optional[str] = None,
+        use_rag: bool = True
     ) -> VoiceSession:
         """Create a new voice session"""
         try:
@@ -46,6 +48,13 @@ class SessionService:
                     max_output_tokens=settings.DEFAULT_MAX_OUTPUT_TOKENS
                 )
 
+            # Get user preferences from database
+            storage_service = StorageService()
+            user_preferences = await storage_service.get_user_preferences(user_id, auth_token)
+
+            # logger.info(f"USER PREFERENCES: {user_preferences}") 
+            # logger.info(f"USE RAG: {use_rag}") 
+
             # Create LiveKit session
             livekit_data = await create_session(
                 user_id=user_id,
@@ -55,6 +64,8 @@ class SessionService:
                     "instructions": instructions,
                     "voice_settings": voice_settings.model_dump() if voice_settings else None,
                     "auth_token": auth_token,  # Pass auth token to agent
+                    "use_rag": use_rag,  # Pass use_rag flag to agent
+                    "preferences": user_preferences,  # Pass user preferences from database
                     "metadata": metadata or {}
                 }
             )

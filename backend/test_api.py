@@ -22,8 +22,8 @@ load_dotenv()
 load_dotenv(".env.local")
 
 # Base URL for the API
-BASE_URL = "http://localhost:8000"
-# BASE_URL = "https://medbot-backend.fly.dev"
+# BASE_URL = "http://localhost:8000"
+BASE_URL = "https://medbot-backend.fly.dev"
 
 # Authentication token
 TOKEN = None
@@ -216,8 +216,8 @@ def run_tests():
         password = input("Enter your password: ")
 
     # Try to register first (this might fail if the user already exists)
-    email = "register@test.com"
-    password = "Password123!"
+    # email = "register@test2.com"
+    # password = "Password123!"
     # register_response = register_user(email, password)
 
     # Login
@@ -234,12 +234,12 @@ def run_tests():
     # get_conversations()
 
     # Create a conversation
-    # create_response = create_conversation()
-    # if create_response.status_code != 201:
-    #     print("Failed to create conversation. Exiting.")
-    #     return
+    create_response = create_conversation()
+    if create_response.status_code != 201:
+        print("Failed to create conversation. Exiting.")
+        return
 
-    # conversation_id = create_response.json().get("id")
+    conversation_id = create_response.json().get("id")
 
     # # Get the created conversation
     # get_conversation(conversation_id)
@@ -251,36 +251,36 @@ def run_tests():
     # get_messages(conversation_id)
 
     # Create a voice session
-    # voice_response = create_voice_session(conversation_id)
-    # if voice_response.status_code == 200:
-    #     session_id = voice_response.json().get("id")
-    #     # Get voice session status
-    #     get_voice_session_status(session_id)
+    voice_response = create_voice_session(conversation_id)
+    if voice_response.status_code == 200:
+        session_id = voice_response.json().get("id")
+        # Get voice session status
+        get_voice_session_status(session_id)
 
-    #     # Delete voice session
-    #     delete_voice_response = requests.delete(
-    #         f"{BASE_URL}/api/v1/voice/session/{session_id}", 
-    #         headers={
-    #             "Authorization": f"Bearer {TOKEN}",
-    #             "X-API-Auth": f"Bearer {TOKEN}"
-    #         }
-    #     )
-    #     print(f"Delete Voice Session Response:")
-    #     print_response(delete_voice_response)
+        # Delete voice session
+        delete_voice_response = requests.delete(
+            f"{BASE_URL}/api/v1/voice/session/{session_id}", 
+            headers={
+                "Authorization": f"Bearer {TOKEN}",
+                "X-API-Auth": f"Bearer {TOKEN}"
+            }
+        )
+        print(f"Delete Voice Session Response:")
+        print_response(delete_voice_response)
 
     # Delete test conversation
-    # delete_response = requests.delete(
-    #     f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
-    #     headers={
-    #         "Authorization": f"Bearer {TOKEN}",
-    #         "X-API-Auth": f"Bearer {TOKEN}"
-    #     }
-    # )
-    # print(f"Delete Conversation Response:")
-    # print_response(delete_response)
+    delete_response = requests.delete(
+        f"{BASE_URL}/api/v1/conversations/{conversation_id}", 
+        headers={
+            "Authorization": f"Bearer {TOKEN}",
+            "X-API-Auth": f"Bearer {TOKEN}"
+        }
+    )
+    print(f"Delete Conversation Response:")
+    print_response(delete_response)
 
     # Get user profile
-    get_user_profile()
+    # get_user_profile()
 
 if __name__ == "__main__":
     run_tests()
