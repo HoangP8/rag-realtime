@@ -102,10 +102,10 @@ def load_vectorstore(model_name: str, chunk_size: int = 1024) -> tuple[FAISS, Op
 class MedicalFunctionContext(llm.FunctionContext):
     """Function context for RAG capabilities following LiveKit best practices."""
 
-    def __init__(self, vectorstore: FAISS, user_preferences: dict = None, use_rag: bool = True):
+    def __init__(self, vectorstore: FAISS, user_preferences: dict = None):
         super().__init__()
         self.vectorstore = vectorstore
-        self.use_rag = use_rag
+        self.use_rag = user_preferences.get("useRAG", True)
         # Set language based on user preferences, default to Vietnamese if not specified
         self.current_language = "vi" if user_preferences.get("isVietnamese", True) else "en"
 
@@ -182,14 +182,13 @@ class MedicalMultimodalAgent(MultimodalAgent):
         model: openai.realtime.RealtimeModel,
         vectorstore: FAISS,
         user_preferences: dict,
-        use_rag: bool = True,
         vad: Optional[Any] = None,
         transcription: AgentTranscriptionOptions = AgentTranscriptionOptions(),
         loop: Optional[asyncio.AbstractEventLoop] = None,
         chat_ctx: Optional[llm.ChatContext] = None,
     ):
         # Initialize RAG function context
-        self.med_fnc_ctx = MedicalFunctionContext(vectorstore=vectorstore, user_preferences=user_preferences, use_rag=use_rag)
+        self.med_fnc_ctx = MedicalFunctionContext(vectorstore=vectorstore, user_preferences=user_preferences)
         self.chat_ctx = chat_ctx  # Store chat context in instance
         self.last_message_timestamp = None  # Track last message timestamp
         self.storage_service = StorageService()  # Initialize storage service
@@ -361,8 +360,6 @@ async def entrypoint(ctx: JobContext):
 
     # Extract user preferences from metadata
     user_preferences = agent_metadata.get("preferences", {})
-    # Get use_rag flag from metadata, default to True if not specified
-    use_rag = agent_metadata.get("use_rag", True)
     
     # Initialize the assistant with user preferences
     assistant = MedicalMultimodalAgent(
@@ -370,15 +367,11 @@ async def entrypoint(ctx: JobContext):
         chat_ctx=chat_ctx, 
         vectorstore=vectorstore,
         user_preferences=user_preferences,
-        use_rag=use_rag
     )
     
     # Setup background task to periodically update chat history
     async def update_history_periodically():
         while True:
-            logger.info(f"AGENT METADATA: {agent_metadata}") # TODO: Test what is agent_metadata
-            logger.info(f"USER PREFERENCES: {user_preferences}") # TODO: Test what is agent_metadata
-            logger.info(f"USE RAG: {use_rag}") # TODO: Test what is agent_metadata
             await assistant.update_chat_history(user_id, conversation_id, auth_token)
             await asyncio.sleep(30)  # Update every 30 seconds
     

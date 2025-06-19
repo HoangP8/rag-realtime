@@ -160,7 +160,7 @@ class ConversationService:
 
             # Call conversation service API
             async with httpx.AsyncClient() as client:
-                response = await client.patch(
+                response = await client.put(
                     f"{self.conversation_service_url}/api/v1/conversations/{conversation_id}",
                     json=update_data,
                     headers=headers

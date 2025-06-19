@@ -33,8 +33,7 @@ class SessionService:
         instructions: Optional[str] = None,
         voice_settings: Optional[VoiceSettings] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        auth_token: Optional[str] = None,
-        use_rag: bool = True
+        auth_token: Optional[str] = None
     ) -> VoiceSession:
         """Create a new voice session"""
         try:
@@ -51,10 +50,7 @@ class SessionService:
             # Get user preferences from database
             storage_service = StorageService()
             user_preferences = await storage_service.get_user_preferences(user_id, auth_token)
-
-            # logger.info(f"USER PREFERENCES: {user_preferences}") 
-            # logger.info(f"USE RAG: {use_rag}") 
-
+            
             # Create LiveKit session
             livekit_data = await create_session(
                 user_id=user_id,
@@ -64,7 +60,6 @@ class SessionService:
                     "instructions": instructions,
                     "voice_settings": voice_settings.model_dump() if voice_settings else None,
                     "auth_token": auth_token,  # Pass auth token to agent
-                    "use_rag": use_rag,  # Pass use_rag flag to agent
                     "preferences": user_preferences,  # Pass user preferences from database
                     "metadata": metadata or {}
                 }

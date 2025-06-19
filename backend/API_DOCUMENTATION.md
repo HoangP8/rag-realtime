@@ -404,7 +404,6 @@ To obtain a token, use the login endpoint. The token will be valid for a limited
       "temperature": 0.8,
       "max_output_tokens": 2048
     },
-    "use_rag": true,
   }
 }
 ```
@@ -496,10 +495,11 @@ To obtain a token, use the login endpoint. The token will be valid for a limited
   "date_of_birth": "1990-01-01",
   "medical_history_id": null,
   "preferences": {
-    "language": "en",
     "voice_preference": "alloy",
     "theme": "light",
-    "notifications_enabled": true
+    "notifications_enabled": true,
+    "isVietnamese": true,
+    "useRAG": true,
   },
   "created_at": "2023-01-01T12:00:00Z",
   "updated_at": "2023-01-01T12:00:00Z"

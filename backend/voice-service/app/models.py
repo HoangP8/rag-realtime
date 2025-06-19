@@ -16,6 +16,8 @@ class VoiceSettings(BaseModel):
 class VoiceSessionCreate(BaseModel):
     """Voice session creation request model"""
     conversation_id: Optional[UUID] = Field(None, description="Associated conversation ID")
+    instructions: Optional[str] = Field(None, description="Custom instructions for the AI assistant")
+    voice_settings: Optional[VoiceSettings] = None
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
 
 class VoiceSession(BaseModel):

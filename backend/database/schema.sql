@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     last_name TEXT,
     date_of_birth DATE,
     medical_history_id UUID,
-    preferences JSONB DEFAULT '{"isVietnamese": true}'::JSONB,
+    preferences JSONB DEFAULT '{"isVietnamese": true, "use_rag": true}'::JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

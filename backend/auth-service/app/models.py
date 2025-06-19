@@ -55,8 +55,8 @@ class UserProfileBase(BaseModel):
     last_name: Optional[str] = None
     date_of_birth: Optional[datetime] = None
     preferences: Dict[str, Any] = Field(
-        default_factory=lambda: {"isVietnamese": True},
-        description="User preferences including 'isVietnamese' flag"
+        default_factory=lambda: {"isVietnamese": True, "use_rag": True},
+        description="User preferences including 'isVietnamese' and 'use_rag' flags"
     )
 
 class UserProfileUpdate(UserProfileBase):
@@ -79,8 +79,8 @@ class UserProfileResponse(UserProfileBase):
 class UserPreferencesBase(BaseModel):
     """Base user preferences model"""
     preferences: Dict[str, Any] = Field(
-        default_factory=lambda: {"isVietnamese": True},
-        description="User preferences including 'isVietnamese' flag"
+        default_factory=lambda: {"isVietnamese": True, "use_rag": True},
+        description="User preferences including 'isVietnamese' and 'use_rag' flags"
     )
 
 

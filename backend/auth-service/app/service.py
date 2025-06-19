@@ -37,7 +37,8 @@ class AuthService:
                 "first_name": user_data.first_name,
                 "last_name": user_data.last_name,
                 "preferences": {
-                    "isVietnamese": True
+                    "isVietnamese": True,
+                    "use_rag": True
                 }
             }
             

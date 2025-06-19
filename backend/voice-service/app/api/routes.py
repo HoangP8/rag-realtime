@@ -115,8 +115,7 @@ async def create_voice_session(
             instructions=session_data.metadata.get("instructions"),
             voice_settings=session_data.metadata.get("voice_settings"),
             metadata=session_data.metadata,
-            auth_token=auth_token,  # Pass auth token to the session service
-            use_rag=session_data.metadata.get("use_rag", True)
+            auth_token=auth_token  # Pass auth token to the session service
         )
         
         # Store in database
