@@ -124,8 +124,8 @@ class MedicalFunctionContext(llm.FunctionContext):
         search_start = time.time()
         
         # Perform similarity search
-        filtered_docs = self.vectorstore.similarity_search(
-            query, k=num_results
+        filtered_docs = self.vectorstore.similarity_search_with_relevance_scores(
+            query, k=num_results, score_threshold=0.35
         )
 
         if not filtered_docs:
@@ -258,31 +258,31 @@ class MedicalMultimodalAgent(MultimodalAgent):
         def on_agent_speech_committed(response):
             log_event("ASSISTANT RESPONSE", f"{response}\n\n")
 
-    async def update_chat_history(self, user_id: str, conversation_id: str, auth_token: str):
-        """Update chat history with new messages only."""
-        try:
-            # Get new messages since last update
-            new_messages = self.storage_service.get_messages_since(
-                conversation_id=conversation_id,
-                auth_token=auth_token,
-                since_timestamp=self.last_message_timestamp
-            ) if self.last_message_timestamp else self.storage_service.get_conversation_history(
-                user_id=user_id,
-                conversation_id=conversation_id,
-                auth_token=auth_token
-            )
+    # async def update_chat_history(self, user_id: str, conversation_id: str, auth_token: str):
+    #     """Update chat history with new messages only."""
+    #     try:
+    #         # Get new messages since last update
+    #         new_messages = self.storage_service.get_messages_since(
+    #             conversation_id=conversation_id,
+    #             auth_token=auth_token,
+    #             since_timestamp=self.last_message_timestamp
+    #         ) if self.last_message_timestamp else self.storage_service.get_conversation_history(
+    #             user_id=user_id,
+    #             conversation_id=conversation_id,
+    #             auth_token=auth_token
+    #         )
 
-            if new_messages:
-                # Update last message timestamp
-                self.last_message_timestamp = new_messages[-1].created_at
+    #         if new_messages:
+    #             # Update last message timestamp
+    #             self.last_message_timestamp = new_messages[-1].created_at
                 
-                # Convert to chat messages and add to context
-                chat_messages = [llm.ChatMessage(role=msg.role, content=msg.content) for msg in new_messages]
-                self.chat_ctx.messages.extend(chat_messages)
+    #             # Convert to chat messages and add to context
+    #             chat_messages = [llm.ChatMessage(role=msg.role, content=msg.content) for msg in new_messages]
+    #             self.chat_ctx.messages.extend(chat_messages)
                 
-                log_event("Chat History Update", f"Added {len(chat_messages)} new messages")
-        except Exception as e:
-            logger.error(f"Error updating chat history: {str(e)}")
+    #             log_event("Chat History Update", f"Added {len(chat_messages)} new messages")
+    #     except Exception as e:
+    #         logger.error(f"Error updating chat history: {str(e)}")
 
 
 def get_user_active_chat_history(auth_token: str, user_id: str = "user_test_123", conversation_id: str = "conversation_test_123") -> Optional[llm.ChatContext]:
@@ -370,13 +370,13 @@ async def entrypoint(ctx: JobContext):
     )
     
     # Setup background task to periodically update chat history
-    async def update_history_periodically():
-        while True:
-            await assistant.update_chat_history(user_id, conversation_id, auth_token)
-            await asyncio.sleep(30)  # Update every 30 seconds
+    # async def update_history_periodically():
+    #     while True:
+    #         await assistant.update_chat_history(user_id, conversation_id, auth_token)
+    #         await asyncio.sleep(30)  # Update every 30 seconds
     
     # Start background task
-    asyncio.create_task(update_history_periodically())
+    # asyncio.create_task(update_history_periodically())
     
     assistant.start(ctx.room, participant)
 
